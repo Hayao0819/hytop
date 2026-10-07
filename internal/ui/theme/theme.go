@@ -31,6 +31,7 @@ const (
 	DiskWrite
 	NetRx
 	NetTx
+	Battery
 
 	Nice
 	Warn
@@ -64,6 +65,7 @@ var tokenNames = []struct {
 	{DiskWrite, "disk-write"},
 	{NetRx, "net-rx"},
 	{NetTx, "net-tx"},
+	{Battery, "battery"},
 	{Nice, "nice"},
 	{Warn, "warn"},
 	{Critical, "critical"},
@@ -178,6 +180,7 @@ func BuildWith(caps render.Caps, palette map[Token]color.Color, options Options)
 		DiskWrite:   lipgloss.Color("1"),
 		NetRx:       lipgloss.Color("6"),
 		NetTx:       lipgloss.Color("3"),
+		Battery:     lipgloss.Color("2"),
 
 		Nice:     lipgloss.Color("6"),
 		Warn:     lipgloss.Color("3"),

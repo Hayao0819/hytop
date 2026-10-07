@@ -32,6 +32,8 @@ const (
 	BitsPerSecond
 	Hertz
 	Watts
+	WattHours
+	Volts
 	Celsius
 	RPM
 	Seconds
@@ -47,6 +49,8 @@ var unitNames = map[Unit]string{
 	BitsPerSecond:  "b/s",
 	Hertz:          "Hz",
 	Watts:          "W",
+	WattHours:      "Wh",
+	Volts:          "V",
 	Celsius:        "°C",
 	RPM:            "rpm",
 	Seconds:        "s",
@@ -103,7 +107,7 @@ func (u Unit) SupportsScale(scale Scale) bool {
 	case Binary, BitScale, ByteScale:
 		return byteLike
 	case Decimal:
-		return byteLike || u == Hertz || u == Watts || u == RPM || u == Count
+		return byteLike || u == Hertz || u == Watts || u == WattHours || u == Volts || u == RPM || u == Count
 	default:
 		return false
 	}

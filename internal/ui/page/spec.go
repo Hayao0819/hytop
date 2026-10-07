@@ -30,6 +30,8 @@ type Env struct {
 	Interfaces func() []string
 	// GPUs includes identifiable cards even when no counters are available.
 	GPUs func() []int
+	// Batteries includes power-supply batteries even when optional readings are absent.
+	Batteries func() []int
 }
 
 // Hint is one key-line entry.

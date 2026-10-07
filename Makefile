@@ -113,7 +113,7 @@ licenses:
 			printf '\n' >> "$$work/output"; \
 		done; \
 	done; \
-	awk '{ lines[NR] = $$0 } END { last = NR; while (last > 0 && lines[last] == "") last--; for (i = 1; i <= last; i++) print lines[i] }' \
+	awk '{ sub(/[[:space:]]+$$/, ""); lines[NR] = $$0 } END { last = NR; while (last > 0 && lines[last] == "") last--; for (i = 1; i <= last; i++) print lines[i] }' \
 		"$$work/output" > "$$work/final"; \
 	mv "$$work/final" $(THIRD_PARTY_FILE)
 

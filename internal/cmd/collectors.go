@@ -97,7 +97,8 @@ func register(
 		return nil, nil, err
 	}
 
-	if err := add(power.New(opts.sysRoot), nil, slow); err != nil {
+	powerCollector := power.New(opts.sysRoot)
+	if err := add(powerCollector, nil, slow); err != nil {
 		return nil, nil, err
 	}
 
@@ -122,6 +123,7 @@ func register(
 	return registry, &devices{
 		interfaces: netCollector.Interfaces,
 		gpus:       gpuCollector.Cards,
+		batteries:  powerCollector.Batteries,
 		units:      unitCollector.Units,
 		mounts:     fsCollector.Mounts,
 	}, nil

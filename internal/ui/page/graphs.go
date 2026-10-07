@@ -56,7 +56,11 @@ func (g *Graphs) refresh() bool {
 
 		return ok
 	})
-	for _, index := range g.env.GPUs() {
+	var gpuIndices []int
+	if g.env.GPUs != nil {
+		gpuIndices = g.env.GPUs()
+	}
+	for _, index := range gpuIndices {
 		index := index
 		key := series.Key(fmt.Sprintf("gpu.%d.util", index))
 		name, ok := g.env.Store.Fact(fmt.Sprintf("gpu.name.%d", index))
@@ -68,6 +72,24 @@ func (g *Graphs) refresh() bool {
 			Title: name, Route: fmt.Sprintf("/graphs/gpu/%d", index), Key: key,
 			Unit: series.Percent, Token: theme.Memory, Max: 100,
 			Build: func(env Env) reactea.Component { return GPU(env, index, name) },
+		})
+	}
+	var batteryIndices []int
+	if g.env.Batteries != nil {
+		batteryIndices = g.env.Batteries()
+	}
+	for _, index := range batteryIndices {
+		index := index
+		key := series.Key(fmt.Sprintf("battery.%d.capacity", index))
+		name, ok := g.env.Store.Fact(fmt.Sprintf("battery.name.%d", index))
+		if !ok || name == "" {
+			name = fmt.Sprintf("Battery %d", index)
+		}
+
+		specs = append(specs, GraphSpec{
+			Title: name, Route: fmt.Sprintf("/graphs/battery/%d", index), Key: key,
+			Unit: series.Percent, Token: theme.Battery, Max: 100,
+			Build: func(env Env) reactea.Component { return Battery(env, index, name) },
 		})
 	}
 

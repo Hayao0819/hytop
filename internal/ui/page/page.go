@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -227,4 +228,44 @@ func GPU(env Env, index int, name string) reactea.Component {
 	)
 
 	return Detail(env, name, g, stats)
+}
+
+func Battery(env Env, index int, name string) reactea.Component {
+	prefix := fmt.Sprintf("battery.%d.", index)
+	g := graph.New(env.Store, env.Caps,
+		graph.Track{Key: series.Key(prefix + "capacity"), Colour: env.Theme.Colour(theme.Battery)},
+	)
+	g.Range = chart.Range{Max: 100}
+	g.Label = "% charge"
+
+	stats := statgrid.New(env.Store,
+		statgrid.Stat{Label: "Charge", Key: series.Key(prefix + "capacity"), Unit: series.Percent, Big: true},
+		statgrid.Stat{Label: "Health", Key: series.Key(prefix + "health"), Unit: series.Percent, Big: true},
+		statgrid.Stat{Label: "Power", Key: series.Key(prefix + "power"), Unit: series.Watts, Precision: 1, Big: true},
+		statgrid.Stat{Label: "Remaining", Key: series.Key(prefix + "time_to_empty"), Unit: series.Duration, Big: true},
+		statgrid.Stat{Label: "Until full", Key: series.Key(prefix + "time_to_full"), Unit: series.Duration, Big: true},
+		statgrid.Stat{Label: "Energy", Key: series.Key(prefix + "energy"), Unit: series.WattHours, Precision: 1},
+		statgrid.Stat{Label: "Full capacity", Key: series.Key(prefix + "energy_full"), Unit: series.WattHours, Precision: 1},
+		statgrid.Stat{Label: "Design capacity", Key: series.Key(prefix + "energy_design"), Unit: series.WattHours, Precision: 1},
+		statgrid.Stat{Label: "Voltage", Key: series.Key(prefix + "voltage"), Unit: series.Volts, Precision: 2},
+		statgrid.Stat{Label: "Temperature", Key: series.Key(prefix + "temp"), Unit: series.Celsius, Precision: 1},
+		statgrid.Stat{Label: "Cycles", Key: series.Key(prefix + "cycles"), Unit: series.Count},
+		statgrid.Stat{Label: "Start charging", Key: series.Key(prefix + "charge_start"), Unit: series.Percent},
+		statgrid.Stat{Label: "Stop charging", Key: series.Key(prefix + "charge_end"), Unit: series.Percent},
+	)
+
+	facts := statgrid.New(env.Store,
+		statgrid.Stat{Label: "Status", Fact: "battery.status." + strconv.Itoa(index)},
+		statgrid.Stat{Label: "Condition", Fact: "battery.health_status." + strconv.Itoa(index)},
+		statgrid.Stat{Label: "Manufacturer", Fact: "battery.vendor." + strconv.Itoa(index)},
+		statgrid.Stat{Label: "Model", Fact: "battery.model." + strconv.Itoa(index)},
+		statgrid.Stat{Label: "Serial", Fact: "battery.serial." + strconv.Itoa(index)},
+		statgrid.Stat{Label: "Technology", Fact: "battery.technology." + strconv.Itoa(index)},
+		statgrid.Stat{Label: "Mains", Fact: series.FactACOnline},
+	)
+
+	page := DetailWithFacts(env, name, g, stats, facts)
+	g.Span = 7 * 24 * time.Hour
+
+	return page
 }

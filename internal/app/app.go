@@ -46,6 +46,7 @@ type Env struct {
 
 	Interfaces    func() []string
 	GPUs          func() []int
+	Batteries     func() []int
 	Units         func() []unitmodel.Unit
 	FollowLog     func() page.LogFollower
 	Mounts        func() []diskmodel.Mount
@@ -105,6 +106,9 @@ func New(env Env) *Root {
 	if env.GPUs == nil {
 		env.GPUs = func() []int { return nil }
 	}
+	if env.Batteries == nil {
+		env.Batteries = func() []int { return nil }
+	}
 
 	root := &Root{env: env, config: env.Config, home: map[string]string{}}
 
@@ -145,6 +149,7 @@ func (r *Root) build() {
 		Columns:    r.config.Columns(),
 		Interfaces: r.env.Interfaces,
 		GPUs:       r.env.GPUs,
+		Batteries:  r.env.Batteries,
 	}
 
 	r.graphs = page.NewGraphs(pageEnv)

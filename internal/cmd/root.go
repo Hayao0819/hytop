@@ -30,6 +30,7 @@ import (
 type devices struct {
 	interfaces func() []string
 	gpus       func() []int
+	batteries  func() []int
 	units      func() []unitmodel.Unit
 	mounts     func() []diskmodel.Mount
 }
@@ -119,7 +120,14 @@ func run(cmd *cobra.Command, opts options) error {
 	state := store.NewViewState()
 
 	// Allocate lazy tiers for any span a hot reload may select.
-	memory := store.New(metric.ResolutionsFor(conf.MaxSpan))
+	memory := store.NewWithPolicies(metric.ResolutionsFor(conf.MaxSpan), store.Policy{
+		Pattern: "battery.*.capacity",
+		Resolutions: []metric.Resolution{
+			{Interval: time.Second, Retention: 10 * time.Minute},
+			{Interval: 10 * time.Second, Retention: 2 * time.Hour},
+			{Interval: 5 * time.Minute, Retention: 7 * 24 * time.Hour},
+		},
+	})
 	scheduler := collect.NewScheduler(memory)
 
 	// Collector intervals follow the active, possibly unsaved configuration.
@@ -202,6 +210,7 @@ func run(cmd *cobra.Command, opts options) error {
 		Live:          watcher,
 		Interfaces:    found.interfaces,
 		GPUs:          found.gpus,
+		Batteries:     found.batteries,
 		Units:         found.units,
 		FollowLog:     func() page.LogFollower { return journal.NewReader(running.Load().Logs.Lines) },
 		Mounts:        found.mounts,

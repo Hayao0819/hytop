@@ -14,7 +14,7 @@ and keymap. hytop ships as a single Go binary.
 ## What it shows
 
 The Graphs view covers CPU, memory, disks, network interfaces, sensors, and
-GPUs.
+GPUs. Battery-capable systems also get charge history and health.
 
 <table>
 <tr>
@@ -57,7 +57,7 @@ Builds cover Linux (`amd64`, `arm64`, `386`, `riscv64`), macOS and Windows
 
 All collectors are available on Linux, including systemd, containers, SMART,
 and pressure metrics. macOS and Windows provide CPU, memory, disk, network, and
-process views.
+process views, plus battery information when available.
 
 ## Keys
 
