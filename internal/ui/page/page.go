@@ -71,15 +71,15 @@ func DetailWithFacts(
 
 // Update adjusts dynamic statistic and fact rows before updating children.
 func (d *detail) Update(ctx *reactea.Ctx, msg tea.Msg) tea.Cmd {
-	d.reshape()
+	d.reshape(ctx.Width())
 
 	return d.Wrapper.Update(ctx, msg)
 }
 
-func (d *detail) reshape() {
-	rows := [2]int{d.stats.Rows(), 0}
+func (d *detail) reshape(width ...int) {
+	rows := [2]int{d.stats.Rows(width...), 0}
 	if d.facts != nil {
-		rows[1] = d.facts.Rows()
+		rows[1] = d.facts.Rows(width...)
 	}
 
 	if rows == d.shaped {

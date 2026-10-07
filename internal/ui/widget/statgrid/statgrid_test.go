@@ -34,3 +34,18 @@ func TestLongCellsDoNotPushOutTheirNeighbours(t *testing.T) {
 		}
 	}
 }
+
+func TestRowsAccountForResponsiveColumns(t *testing.T) {
+	t.Parallel()
+
+	widget := statgrid.New(store.New(nil),
+		statgrid.Stat{Text: "1"}, statgrid.Stat{Text: "2"}, statgrid.Stat{Text: "3"},
+		statgrid.Stat{Text: "4"}, statgrid.Stat{Text: "5"},
+	)
+	if got := widget.Rows(); got != 4 {
+		t.Fatalf("Rows() = %d, want 4", got)
+	}
+	if got := widget.Rows(36); got != 6 {
+		t.Fatalf("Rows(36) = %d, want 6", got)
+	}
+}

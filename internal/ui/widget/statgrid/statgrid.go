@@ -38,14 +38,18 @@ func New(s *store.Store, stats ...Stat) *Widget {
 	return &Widget{store: s, stats: stats, Columns: 4}
 }
 
-// Rows returns the height after unavailable readings are omitted.
-func (w *Widget) Rows() int {
+// Rows returns the height after unavailable readings are omitted. When width
+// is known, it accounts for the same responsive column count as Render.
+func (w *Widget) Rows(width ...int) int {
 	present := len(w.present())
 	if present == 0 {
 		return 0
 	}
 
 	columns := max(1, w.Columns)
+	if len(width) > 0 {
+		columns = max(1, min(columns, width[0]/18))
+	}
 
 	return 2 * ((present + columns - 1) / columns)
 }
