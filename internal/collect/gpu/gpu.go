@@ -186,6 +186,8 @@ func (c *Collector) Collect(ctx context.Context, now time.Time) ([]metric.Sample
 			{"util", []string{"gpu_busy_percent"}, 1},
 			{"mem.used", []string{"mem_info_vram_used"}, 1},
 			{"mem.total", []string{"mem_info_vram_total"}, 1},
+			{"mem.gtt.used", []string{"mem_info_gtt_used"}, 1},
+			{"mem.gtt.total", []string{"mem_info_gtt_total"}, 1},
 		} {
 			for _, file := range reading.files {
 				if value, ok := sysread.Float(filepath.Join(card.dir, file)); ok {
@@ -235,19 +237,34 @@ func (c card) hwmon(id string, now time.Time) []metric.Sample {
 
 	for _, reading := range []struct {
 		key     string
-		file    string
+		files   []string
 		divisor float64
 	}{
-		{"temp", "temp1_input", 1000},
-		{"power", "power1_average", 1e6},
-		{"clock", "freq1_input", 1},
+		{"temp", []string{"temp1_input"}, 1000},
+		{"power", []string{"power1_average", "power1_input"}, 1e6},
+		{"clock", []string{"freq1_input"}, 1},
+		{"fan.rpm", []string{"fan1_input"}, 1},
 	} {
-		if value, ok := sysread.Float(filepath.Join(dir, reading.file)); ok {
-			samples = append(samples, metric.Sample{
-				Key:   series.Key("gpu." + id + "." + reading.key),
-				Value: value / reading.divisor,
-				Time:  now,
-			})
+		for _, file := range reading.files {
+			if value, ok := sysread.Float(filepath.Join(dir, file)); ok {
+				samples = append(samples, metric.Sample{
+					Key:   series.Key("gpu." + id + "." + reading.key),
+					Value: value / reading.divisor,
+					Time:  now,
+				})
+				break
+			}
+		}
+	}
+
+	for n := 1; n <= 8; n++ {
+		if label, ok := sysread.String(filepath.Join(dir, "freq"+strconv.Itoa(n)+"_label")); ok && label == "mclk" {
+			if value, ok := sysread.Float(filepath.Join(dir, "freq"+strconv.Itoa(n)+"_input")); ok {
+				samples = append(samples, metric.Sample{
+					Key: series.Key("gpu." + id + ".mem.clock"), Value: value, Time: now,
+				})
+			}
+			break
 		}
 	}
 
@@ -263,12 +280,36 @@ func (c *Collector) Facts(context.Context) (collect.Facts, error) {
 	facts := collect.Facts{}
 
 	for _, card := range cards {
-		facts[series.FactGPUName+"."+strconv.Itoa(card.index)] = card.name
+		id := strconv.Itoa(card.index)
+		facts[series.FactGPUName+"."+id] = card.name
+		if !card.asleep() {
+			link := pcieLink(card.dir, "current")
+			if link != "" {
+				facts["gpu."+id+".pcie.current"] = link
+			}
+			maximum := pcieLink(card.dir, "max")
+			if maximum != "" {
+				facts["gpu."+id+".pcie.max"] = maximum
+			}
+		}
 	}
 
 	facts[series.FactGPUName] = cards[0].name
 
 	return facts, nil
+}
+
+func pcieLink(dir, kind string) string {
+	speed, _ := sysread.String(filepath.Join(dir, kind+"_link_speed"))
+	width, _ := sysread.String(filepath.Join(dir, kind+"_link_width"))
+	if speed == "" {
+		return ""
+	}
+	if width != "" {
+		return speed + " ×" + width
+	}
+
+	return speed
 }
 
 // Cards returns discovered DRM card indices.

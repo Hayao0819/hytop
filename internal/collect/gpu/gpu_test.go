@@ -128,3 +128,63 @@ func TestCardDiscoveryUsesItsOwnInterval(t *testing.T) {
 		t.Fatalf("Facts() after removal = %v, %v", facts, err)
 	}
 }
+
+func TestSysfsCollectsGTTAndHwmonDetails(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	sysRoot := filepath.Join(root, "sys")
+	device := filepath.Join(sysRoot, "devices", "0000:03:00.0")
+	card := filepath.Join(sysRoot, "class", "drm", "card0")
+	if err := os.MkdirAll(filepath.Join(device, "hwmon", "hwmon0"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(card, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(device, filepath.Join(card, "device")); err != nil {
+		t.Fatal(err)
+	}
+
+	values := map[string]string{
+		"mem_info_gtt_used": "1024\n", "mem_info_gtt_total": "4096\n",
+		"current_link_speed": "8.0 GT/s PCIe\n", "current_link_width": "16\n",
+		"max_link_speed": "16.0 GT/s PCIe\n", "max_link_width": "16\n",
+		"hwmon/hwmon0/power1_input": "3000000\n",
+		"hwmon/hwmon0/fan1_input":   "1200\n",
+		"hwmon/hwmon0/freq2_label":  "mclk\n",
+		"hwmon/hwmon0/freq2_input":  "167000000\n",
+	}
+	for name, value := range values {
+		if err := os.WriteFile(filepath.Join(device, name), []byte(value), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	collector := New(sysRoot, filepath.Join(root, "run"))
+	samples, err := collector.Collect(t.Context(), time.Unix(1, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[series.Key]float64{}
+	for _, sample := range samples {
+		got[sample.Key] = sample.Value
+	}
+	for key, want := range map[series.Key]float64{
+		"gpu.0.mem.gtt.used": 1024, "gpu.0.mem.gtt.total": 4096,
+		"gpu.0.power": 3, "gpu.0.fan.rpm": 1200, "gpu.0.mem.clock": 167000000,
+	} {
+		if got[key] != want {
+			t.Errorf("%s = %v, want %v", key, got[key], want)
+		}
+	}
+
+	facts, err := collector.Facts(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if facts["gpu.0.pcie.current"] != "8.0 GT/s PCIe ×16" ||
+		facts["gpu.0.pcie.max"] != "16.0 GT/s PCIe ×16" {
+		t.Fatalf("PCIe facts = %v", facts)
+	}
+}

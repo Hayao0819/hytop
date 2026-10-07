@@ -230,6 +230,15 @@ func GPU(env Env, index int, name string) reactea.Component {
 		statgrid.Stat{Label: "Power", Key: series.Key(prefix + "power"), Unit: series.Watts, Precision: 1, Big: true},
 		statgrid.Stat{Label: "Memory total", Key: series.Key(prefix + "mem.total"), Unit: series.Bytes, Precision: 1},
 		statgrid.Stat{Label: "Clock", Key: series.Key(prefix + "clock"), Unit: series.Hertz, Precision: 2},
+		statgrid.Stat{Label: "Memory clock", Key: series.Key(prefix + "mem.clock"), Unit: series.Hertz, Precision: 2},
+		statgrid.Stat{Label: "GTT memory", Key: series.Key(prefix + "mem.gtt.used"), Unit: series.Bytes, Precision: 1},
+		statgrid.Stat{Label: "GTT total", Key: series.Key(prefix + "mem.gtt.total"), Unit: series.Bytes, Precision: 1},
+		statgrid.Stat{Label: "Encoder", Key: series.Key(prefix + "encode"), Unit: series.Percent},
+		statgrid.Stat{Label: "Decoder", Key: series.Key(prefix + "decode"), Unit: series.Percent},
+		statgrid.Stat{Label: "Fan", Key: series.Key(prefix + "fan"), Unit: series.Percent},
+		statgrid.Stat{Label: "Fan speed", Key: series.Key(prefix + "fan.rpm"), Unit: series.RPM},
+		statgrid.Stat{Label: "PCIe link", Fact: prefix + "pcie.current"},
+		statgrid.Stat{Label: "PCIe maximum", Fact: prefix + "pcie.max"},
 		statgrid.Stat{Label: "Card", Fact: fmt.Sprintf("gpu.name.%d", index)},
 	)
 

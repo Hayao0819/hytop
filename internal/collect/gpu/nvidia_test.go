@@ -16,7 +16,7 @@ func TestNVIDIAMetricsJoinToTheDRMCardByPCIBus(t *testing.T) {
 
 	now := time.Unix(100, 0)
 	samples, err := parseNVIDIA(
-		[]byte("00000000:08:00.0, 12, 321, 12288, 42, 17.69, 210\n"),
+		[]byte("00000000:08:00.0, 12, 321, 12288, 42, 17.69, 210, 3, 4, 35, 405, 1, 4, 4, 16\n"),
 		map[string]int{"0:08:00.0": 1},
 		now,
 	)
@@ -30,12 +30,20 @@ func TestNVIDIAMetricsJoinToTheDRMCardByPCIBus(t *testing.T) {
 	}
 
 	for key, want := range map[string]float64{
-		"gpu.1.util":      12,
-		"gpu.1.mem.used":  321 * 1024 * 1024,
-		"gpu.1.mem.total": 12288 * 1024 * 1024,
-		"gpu.1.temp":      42,
-		"gpu.1.power":     17.69,
-		"gpu.1.clock":     210e6,
+		"gpu.1.util":           12,
+		"gpu.1.mem.used":       321 * 1024 * 1024,
+		"gpu.1.mem.total":      12288 * 1024 * 1024,
+		"gpu.1.temp":           42,
+		"gpu.1.power":          17.69,
+		"gpu.1.clock":          210e6,
+		"gpu.1.encode":         3,
+		"gpu.1.decode":         4,
+		"gpu.1.fan":            35,
+		"gpu.1.mem.clock":      405e6,
+		"gpu.1.pcie.gen":       1,
+		"gpu.1.pcie.gen_max":   4,
+		"gpu.1.pcie.width":     4,
+		"gpu.1.pcie.width_max": 16,
 	} {
 		if got[key] != want {
 			t.Errorf("%s = %v, want %v; all samples: %v", key, got[key], want, got)
@@ -50,7 +58,7 @@ func TestCollectNVIDIAExecutesOncePerInterval(t *testing.T) {
 	script := filepath.Join(dir, "nvidia-smi")
 	args := filepath.Join(dir, "args")
 	body := "#!/bin/sh\nprintf '%s\\n' \"$@\" > " + args +
-		"\nprintf '00000000:08:00.0, 12, 321, 12288, 42, 17.69, 210\\n'\n"
+		"\nprintf '00000000:08:00.0, 12, 321, 12288, 42, 17.69, 210, 3, 4, 35, 405, 1, 4, 4, 16\\n'\n"
 	if err := os.WriteFile(script, []byte(body), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +69,7 @@ func TestCollectNVIDIAExecutesOncePerInterval(t *testing.T) {
 	}
 	now := time.Unix(100, 0)
 	samples, err := collector.collectNVIDIA(context.Background(), now)
-	if err != nil || len(samples) != 6 {
+	if err != nil || len(samples) != 14 {
 		t.Fatalf("first collection = %d samples, %v", len(samples), err)
 	}
 	called, err := os.ReadFile(args)

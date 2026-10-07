@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	nvidiaQuery    = "pci.bus_id,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw,clocks.gr"
+	nvidiaQuery    = "pci.bus_id,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw,clocks.gr,utilization.encoder,utilization.decoder,fan.speed,clocks.mem,pcie.link.gen.current,pcie.link.gen.max,pcie.link.width.current,pcie.link.width.max"
 	nvidiaInterval = 2 * time.Second
 )
 
@@ -75,7 +75,7 @@ func parseNVIDIA(out []byte, byBus map[string]int, now time.Time) ([]metric.Samp
 
 	var samples []metric.Sample
 	for _, record := range records {
-		if len(record) != 7 {
+		if len(record) != 15 {
 			continue
 		}
 		index, ok := byBus[normalizeBusID(record[0])]
@@ -94,6 +94,14 @@ func parseNVIDIA(out []byte, byBus map[string]int, now time.Time) ([]metric.Samp
 			{key: "temp", multiplier: 1},
 			{key: "power", multiplier: 1},
 			{key: "clock", multiplier: 1e6},
+			{key: "encode", multiplier: 1},
+			{key: "decode", multiplier: 1},
+			{key: "fan", multiplier: 1},
+			{key: "mem.clock", multiplier: 1e6},
+			{key: "pcie.gen", multiplier: 1},
+			{key: "pcie.gen_max", multiplier: 1},
+			{key: "pcie.width", multiplier: 1},
+			{key: "pcie.width_max", multiplier: 1},
 		} {
 			value, err := strconv.ParseFloat(strings.TrimSpace(record[column+1]), 64)
 			if err != nil {
