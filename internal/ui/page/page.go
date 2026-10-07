@@ -123,6 +123,12 @@ func Memory(env Env) reactea.Component {
 		statgrid.Stat{Label: "Total", Key: "mem.total", Unit: series.Bytes, Precision: 1},
 		statgrid.Stat{Label: "Swap used", Key: "swap.used", Unit: series.Bytes, Precision: 1},
 		statgrid.Stat{Label: "Swap total", Key: "swap.total", Unit: series.Bytes, Precision: 1},
+		statgrid.Stat{Label: "zram stored", Key: "mem.zram.original", Unit: series.Bytes, Precision: 1},
+		statgrid.Stat{Label: "zram compressed", Key: "mem.zram.compressed", Unit: series.Bytes, Precision: 1},
+		statgrid.Stat{Label: "zram memory", Key: "mem.zram.used", Unit: series.Bytes, Precision: 1},
+		statgrid.Stat{Label: "zram ratio", Key: "mem.zram.ratio", Unit: series.None, Precision: 2},
+		statgrid.Stat{Label: "zswap stored", Key: "mem.zswap.stored", Unit: series.Bytes, Precision: 1},
+		statgrid.Stat{Label: "zswap compressed", Key: "mem.zswap.compressed", Unit: series.Bytes, Precision: 1},
 		statgrid.Stat{Label: "Pressure 10s", Key: "psi.memory.some.avg10", Unit: series.Percent, Precision: 2},
 		statgrid.Stat{Label: "Pressure 60s", Key: "psi.memory.some.avg60", Unit: series.Percent, Precision: 2},
 	)

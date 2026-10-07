@@ -13,8 +13,9 @@ import (
 
 type Collector struct{}
 
-func New(string) (*Collector, error)           { return &Collector{}, nil }
-func (*Collector) Check() collect.Availability { return collect.Availability{State: collect.Ready} }
+func New(string, ...string) (*Collector, error) { return &Collector{}, nil }
+func (*Collector) Check() collect.Availability  { return collect.Availability{State: collect.Ready} }
+
 func (*Collector) Collect(ctx context.Context, now time.Time) ([]metric.Sample, error) {
 	v, err := psmem.VirtualMemoryWithContext(ctx)
 	if err != nil {

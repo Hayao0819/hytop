@@ -55,7 +55,7 @@ func register(
 		return nil, nil, err
 	}
 
-	memCollector, err := mem.New(opts.procRoot)
+	memCollector, err := mem.New(opts.procRoot, opts.sysRoot)
 	if err := add(memCollector, err, base); err != nil {
 		return nil, nil, err
 	}
