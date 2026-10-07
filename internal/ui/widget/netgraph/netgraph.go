@@ -74,6 +74,11 @@ func (w *Widget) heading(width int) string {
 		dim   = lipgloss.NewStyle().Faint(true)
 		parts = []string{lipgloss.NewStyle().Bold(true).Render(safe.Text(w.iface))}
 	)
+	for _, attribute := range []string{"kind", "state", "ip", "address"} {
+		if value, ok := w.store.Fact(string(w.key(attribute))); ok {
+			parts = append(parts, dim.Render(value))
+		}
+	}
 
 	if speed, ok := w.store.Last(w.key("speed")); ok {
 		parts = append(parts, dim.Render("link "+series.BitsPerSecond.Format(speed.Value, 0, series.Auto)))

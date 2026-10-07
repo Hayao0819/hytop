@@ -4,7 +4,10 @@ package net
 
 import (
 	"context"
+	"maps"
 	"slices"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -21,6 +24,8 @@ type Collector struct {
 	mu         sync.Mutex
 	last       map[string]reading
 	interfaces []string
+	facts      collect.Facts
+	factsAt    time.Time
 }
 
 func New(_ string, _ string) (*Collector, error) { return &Collector{last: map[string]reading{}}, nil }
@@ -76,4 +81,45 @@ func (c *Collector) Collect(ctx context.Context, now time.Time) ([]metric.Sample
 	c.interfaces = rankInterfaces(list)
 	samples = append(samples, metric.Sample{Key: "net.total.rx", Value: rateRX, Time: now}, metric.Sample{Key: "net.total.tx", Value: rateTX, Time: now}, metric.Sample{Key: "net.total.rx.total", Value: float64(totalRX), Time: now}, metric.Sample{Key: "net.total.tx.total", Value: float64(totalTX), Time: now})
 	return samples, nil
+}
+
+func (c *Collector) Facts(ctx context.Context) (collect.Facts, error) {
+	now := time.Now()
+	c.mu.Lock()
+	if c.facts != nil && now.Sub(c.factsAt) >= 0 && now.Sub(c.factsAt) < 5*time.Second {
+		facts := maps.Clone(c.facts)
+		c.mu.Unlock()
+
+		return facts, nil
+	}
+	c.mu.Unlock()
+
+	interfaces, err := psnet.InterfacesWithContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	facts := make(collect.Facts)
+	for _, iface := range interfaces {
+		set := func(attribute, value string) {
+			if value != "" {
+				facts[fact(iface.Name, attribute)] = value
+			}
+		}
+		addresses := make([]string, 0, len(iface.Addrs))
+		for _, address := range iface.Addrs {
+			addresses = append(addresses, address.Addr)
+		}
+		set("state", strings.Join(iface.Flags, ", "))
+		set("address", iface.HardwareAddr)
+		set("ip", strings.Join(addresses, ", "))
+		if iface.MTU > 0 {
+			set("mtu", strconv.Itoa(iface.MTU))
+		}
+	}
+	c.mu.Lock()
+	c.facts, c.factsAt = maps.Clone(facts), now
+	c.mu.Unlock()
+
+	return facts, nil
 }

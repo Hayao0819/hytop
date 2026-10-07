@@ -6,12 +6,17 @@ package net
 import (
 	"context"
 	"maps"
+	"os"
+	"path/filepath"
 	"sort"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/prometheus/procfs"
 	"github.com/prometheus/procfs/sysfs"
+	psnet "github.com/shirou/gopsutil/v4/net"
 
 	"github.com/Hayao0819/hytop/internal/collect"
 	"github.com/Hayao0819/hytop/internal/domain/metric"
@@ -26,11 +31,15 @@ type reading struct {
 type Collector struct {
 	fs       procfs.FS
 	sys      sysfs.FS
+	procRoot string
+	sysRoot  string
 	previous map[string]reading
 	mu       sync.RWMutex
 	activity map[string]uint64
 	links    sysfs.NetClass
 	linksAt  time.Time
+	facts    collect.Facts
+	factsAt  time.Time
 }
 
 const linkRefresh = 5 * time.Second
@@ -46,7 +55,8 @@ func New(root, sysRoot string) (*Collector, error) {
 	}
 
 	return &Collector{
-		fs: fs, sys: sys, previous: make(map[string]reading), activity: make(map[string]uint64),
+		fs: fs, sys: sys, procRoot: root, sysRoot: sysRoot,
+		previous: make(map[string]reading), activity: make(map[string]uint64),
 	}, nil
 }
 
@@ -250,4 +260,72 @@ func (c *Collector) setActivity(name string, bytes uint64) {
 		return
 	}
 	c.activity[name] = bytes
+}
+
+func (c *Collector) Facts(ctx context.Context) (collect.Facts, error) {
+	now := time.Now()
+	c.mu.RLock()
+	if c.facts != nil && now.Sub(c.factsAt) >= 0 && now.Sub(c.factsAt) < linkRefresh {
+		facts := maps.Clone(c.facts)
+		c.mu.RUnlock()
+
+		return facts, nil
+	}
+	c.mu.RUnlock()
+
+	links := c.linkState(now)
+	facts := make(collect.Facts)
+
+	addresses := map[string]string{}
+	if filepath.Clean(c.procRoot) == "/proc" {
+		if interfaces, err := psnet.InterfacesWithContext(ctx); err == nil {
+			for _, iface := range interfaces {
+				values := make([]string, 0, len(iface.Addrs))
+				for _, address := range iface.Addrs {
+					values = append(values, address.Addr)
+				}
+				addresses[iface.Name] = strings.Join(values, ", ")
+			}
+		}
+	}
+
+	for name, link := range links {
+		set := func(attribute, value string) {
+			if value != "" {
+				facts[fact(name, attribute)] = value
+			}
+		}
+
+		set("state", link.OperState)
+		set("kind", c.interfaceKind(name, link.Type))
+		set("address", link.Address)
+		set("duplex", link.Duplex)
+		set("ip", addresses[name])
+		if link.MTU != nil {
+			set("mtu", strconv.FormatInt(*link.MTU, 10))
+		}
+	}
+	c.mu.Lock()
+	c.facts, c.factsAt = maps.Clone(facts), now
+	c.mu.Unlock()
+
+	return facts, nil
+}
+
+func (c *Collector) interfaceKind(name string, linkType *int64) string {
+	dir := filepath.Join(c.sysRoot, "class", "net", name)
+	if _, err := os.Stat(filepath.Join(dir, "wireless")); err == nil {
+		return "Wi-Fi"
+	}
+	if target, err := filepath.EvalSymlinks(dir); err == nil && strings.Contains(target, "/virtual/") {
+		return "virtual"
+	}
+	if linkType != nil && *linkType == 1 {
+		return "Ethernet"
+	}
+	if linkType != nil {
+		return "link type " + strconv.FormatInt(*linkType, 10)
+	}
+
+	return ""
 }

@@ -10,6 +10,8 @@ func key(iface, what string) series.Key {
 	return series.Key("net." + series.NormalizeSegment(iface) + "." + what)
 }
 
+func fact(iface, what string) string { return string(key(iface, what)) }
+
 type interfaceTraffic struct {
 	name     string
 	active   uint64

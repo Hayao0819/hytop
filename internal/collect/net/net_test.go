@@ -20,6 +20,10 @@ func TestInterfacesAndSpeedComeFromTypedSysfsData(t *testing.T) {
 	mustWrite(t, filepath.Join(procRoot, "net", "dev"), "Inter-| Receive | Transmit\n face |bytes packets errs drop fifo frame compressed multicast|bytes packets errs drop fifo colls carrier compressed\n  eth0: 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n  tap0: 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n")
 	mustWrite(t, filepath.Join(sysRoot, "class", "net", "eth0", "carrier"), "1\n")
 	mustWrite(t, filepath.Join(sysRoot, "class", "net", "eth0", "speed"), "2500\n")
+	mustWrite(t, filepath.Join(sysRoot, "class", "net", "eth0", "operstate"), "up\n")
+	mustWrite(t, filepath.Join(sysRoot, "class", "net", "eth0", "address"), "00:11:22:33:44:55\n")
+	mustWrite(t, filepath.Join(sysRoot, "class", "net", "eth0", "mtu"), "1500\n")
+	mustWrite(t, filepath.Join(sysRoot, "class", "net", "eth0", "type"), "1\n")
 	mustWrite(t, filepath.Join(sysRoot, "class", "net", "tap0", "carrier"), "0\n")
 
 	collector, err := New(procRoot, sysRoot)
@@ -29,6 +33,14 @@ func TestInterfacesAndSpeedComeFromTypedSysfsData(t *testing.T) {
 
 	if got := collector.Interfaces(); len(got) != 1 || got[0] != "eth0" {
 		t.Fatalf("Interfaces() = %v, want [eth0]", got)
+	}
+	facts, err := collector.Facts(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if facts["net.eth0.state"] != "up" || facts["net.eth0.kind"] != "Ethernet" ||
+		facts["net.eth0.address"] != "00:11:22:33:44:55" || facts["net.eth0.mtu"] != "1500" {
+		t.Fatalf("Facts() = %v", facts)
 	}
 
 	_, _ = collector.Collect(t.Context(), time.Unix(1, 0))
