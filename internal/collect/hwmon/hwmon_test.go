@@ -33,6 +33,8 @@ func TestCollectorNamesAndScalesSensorChannels(t *testing.T) {
 	write(t, filepath.Join(dir, "temp2_input"), "51000\n")
 	write(t, filepath.Join(dir, "fan2_input"), "1350\n")
 	write(t, filepath.Join(dir, "power1_average"), "22500000\n")
+	write(t, filepath.Join(dir, "power1_input"), "25000000\n")
+	write(t, filepath.Join(dir, "power2_input"), "3000000\n")
 
 	collector := New(root)
 	if availability := collector.Check(); availability.State != collect.Ready {
@@ -52,6 +54,7 @@ func TestCollectorNamesAndScalesSensorChannels(t *testing.T) {
 		"thermal.nct_6775_temp2.temp":       51,
 		"fan.nct_6775_fan2.rpm":             1350,
 		"power.nct_6775_power1.watts":       22.5,
+		"power.nct_6775_power2.watts":       3,
 		"thermal.max.temp":                  51,
 	} {
 		if got[key] != want {

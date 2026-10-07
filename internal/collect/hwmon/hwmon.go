@@ -38,15 +38,18 @@ func (c *Collector) Check() collect.Availability {
 }
 
 // reading is one sensor file: what it measures and what to divide by.
-var readings = []struct {
+type sensorReading struct {
 	prefix  string
 	suffix  string
 	divisor float64
 	kind    string
-}{
+}
+
+var readings = []sensorReading{
 	{"temp", "_input", 1000, "thermal"},
 	{"fan", "_input", 1, "fan"},
 	{"power", "_average", 1e6, "power"},
+	{"power", "_input", 1e6, "power"},
 }
 
 func (c *Collector) Collect(_ context.Context, now time.Time) ([]metric.Sample, error) {
@@ -77,8 +80,7 @@ func (c *Collector) Collect(_ context.Context, now time.Time) ([]metric.Sample, 
 				if !strings.HasPrefix(file.Name(), reading.prefix) || !strings.HasSuffix(file.Name(), reading.suffix) {
 					continue
 				}
-
-				value, ok := sysread.Float(filepath.Join(dir, file.Name()))
+				value, ok := reading.read(dir, file.Name())
 				if !ok {
 					continue
 				}
@@ -110,6 +112,17 @@ func (c *Collector) Collect(_ context.Context, now time.Time) ([]metric.Sample, 
 	}
 
 	return samples, nil
+}
+
+func (r sensorReading) read(dir, file string) (float64, bool) {
+	if r.prefix == "power" && r.suffix == "_input" {
+		channel := strings.TrimSuffix(file, r.suffix)
+		if _, ok := sysread.String(filepath.Join(dir, channel+"_average")); ok {
+			return 0, false
+		}
+	}
+
+	return sysread.Float(filepath.Join(dir, file))
 }
 
 // labelOf prefers the name the driver gives a channel over its file number,
