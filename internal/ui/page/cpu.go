@@ -104,6 +104,7 @@ func cpuStats(env Env) *statgrid.Widget {
 		statgrid.Stat{Label: "Utilisation", Key: "cpu.total.usage", Unit: series.Percent, Precision: 1, Big: true},
 		statgrid.Stat{Label: "Speed", Key: "cpu.total.freq", Unit: series.Hertz, Precision: 2, Big: true},
 		statgrid.Stat{Label: "Temperature", Key: "cpu.package.temp", Unit: series.Celsius, Big: true},
+		statgrid.Stat{Label: "Package power", Key: "cpu.package.power", Unit: series.Watts, Precision: 1, Big: true},
 		statgrid.Stat{Label: "Up time", Key: "system.uptime", Unit: series.Duration, Big: true},
 		statgrid.Stat{Label: "Processes", Key: "proc.count", Unit: series.Count},
 		statgrid.Stat{Label: "Threads", Key: "proc.threads", Unit: series.Count},

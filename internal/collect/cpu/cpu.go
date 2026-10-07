@@ -27,6 +27,12 @@ type Collector struct {
 
 	previous map[string]procfs.CPUStat
 	sensor   string
+	rapl     map[string]energyReading
+}
+
+type energyReading struct {
+	energy float64
+	time   time.Time
 }
 
 func New(root, sysRoot string) (*Collector, error) {
@@ -35,7 +41,10 @@ func New(root, sysRoot string) (*Collector, error) {
 		return nil, errors.Wrapf(err, "opening %s", root)
 	}
 
-	c := &Collector{fs: fs, sysRoot: sysRoot, previous: make(map[string]procfs.CPUStat)}
+	c := &Collector{
+		fs: fs, sysRoot: sysRoot, previous: make(map[string]procfs.CPUStat),
+		rapl: make(map[string]energyReading),
+	}
 	c.sensor = c.findSensor()
 
 	return c, nil
@@ -83,15 +92,64 @@ func (c *Collector) Collect(_ context.Context, now time.Time) ([]metric.Sample, 
 		samples = append(samples, metric.Sample{Key: "cpu.package.temp", Value: temp, Time: now})
 	}
 
-	if boot, err := c.fs.Stat(); err == nil && boot.BootTime > 0 {
+	if power, ok := c.packagePower(now); ok {
+		samples = append(samples, metric.Sample{Key: "cpu.package.power", Value: power, Time: now})
+	}
+
+	if stat.BootTime > 0 {
 		samples = append(samples, metric.Sample{
 			Key:   "system.uptime",
-			Value: now.Sub(time.Unix(int64(boot.BootTime), 0)).Seconds(),
+			Value: now.Sub(time.Unix(int64(stat.BootTime), 0)).Seconds(),
 			Time:  now,
 		})
 	}
 
 	return samples, nil
+}
+
+func (c *Collector) packagePower(now time.Time) (float64, bool) {
+	root := filepath.Join(c.sysRoot, "class", "powercap")
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return 0, false
+	}
+
+	var total float64
+	var measured bool
+	for _, entry := range entries {
+		dir := filepath.Join(root, entry.Name())
+		name := sysread.Text(filepath.Join(dir, "name"))
+		if name != "package" && !strings.HasPrefix(name, "package-") {
+			continue
+		}
+
+		energy, ok := sysread.Float(filepath.Join(dir, "energy_uj"))
+		if !ok {
+			continue
+		}
+		previous, seen := c.rapl[dir]
+		c.rapl[dir] = energyReading{energy: energy, time: now}
+		if !seen || !now.After(previous.time) {
+			continue
+		}
+
+		delta := energy - previous.energy
+		if delta < 0 {
+			maximum, ok := sysread.Float(filepath.Join(dir, "max_energy_range_uj"))
+			if !ok || maximum <= previous.energy {
+				continue
+			}
+			delta += maximum
+		}
+		if delta < 0 {
+			continue
+		}
+
+		total += delta / 1e6 / now.Sub(previous.time).Seconds()
+		measured = true
+	}
+
+	return total, measured
 }
 
 // clocks prefers cpufreq, which is per core and current. /proc/cpuinfo reports

@@ -40,6 +40,9 @@ func TestCollectorReadsRatesClocksTemperatureAndFacts(t *testing.T) {
 	write(t, filepath.Join(sysRoot, "devices/system/cpu/cpu0/cpufreq/base_frequency"), "3600000\n")
 	write(t, filepath.Join(sysRoot, "class/hwmon/hwmon0/name"), "coretemp\n")
 	write(t, filepath.Join(sysRoot, "class/hwmon/hwmon0/temp1_input"), "55000\n")
+	write(t, filepath.Join(sysRoot, "class/powercap/intel-rapl:0/name"), "package-0\n")
+	write(t, filepath.Join(sysRoot, "class/powercap/intel-rapl:0/energy_uj"), "1000000\n")
+	write(t, filepath.Join(sysRoot, "class/powercap/intel-rapl:0/max_energy_range_uj"), "1000000000\n")
 
 	collector, err := New(procRoot, sysRoot)
 	if err != nil {
@@ -51,6 +54,7 @@ func TestCollectorReadsRatesClocksTemperatureAndFacts(t *testing.T) {
 
 	_, _ = collector.Collect(t.Context(), time.Unix(1000, 0))
 	write(t, filepath.Join(procRoot, "stat"), stat(130, 70, 900))
+	write(t, filepath.Join(sysRoot, "class/powercap/intel-rapl:0/energy_uj"), "3000000\n")
 	samples, err := collector.Collect(t.Context(), time.Unix(1001, 0))
 	if err != nil {
 		t.Fatal(err)
@@ -63,7 +67,8 @@ func TestCollectorReadsRatesClocksTemperatureAndFacts(t *testing.T) {
 	for key, want := range map[series.Key]float64{
 		"cpu.total.usage": 50, "cpu.core.0.usage": 50,
 		"cpu.total.freq": 2e9, "cpu.core.0.freq": 2e9,
-		"cpu.package.temp": 55, "proc.blocked": 2, "system.uptime": 901,
+		"cpu.package.temp": 55, "cpu.package.power": 2,
+		"proc.blocked": 2, "system.uptime": 901,
 	} {
 		if got[key] != want {
 			t.Errorf("%s = %v, want %v; samples=%v", key, got[key], want, got)
