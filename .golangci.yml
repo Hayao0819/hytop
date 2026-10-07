@@ -1,0 +1,286 @@
+version: "2"
+
+# arch-go.yml is the single source of truth for production package direction.
+# depguard complements it with external-import policy and test-only imports,
+# because arch-go intentionally analyzes production packages only.
+linters:
+  default: none
+  enable: [depguard, dupl, errcheck, gocognit, gocritic, gocyclo, ineffassign, staticcheck, unused]
+  settings:
+    dupl:
+      threshold: 120
+    gocognit:
+      min-complexity: 25
+    gocyclo:
+      min-complexity: 20
+    depguard:
+      rules:
+        production:
+          files: ["!$test"]
+          list-mode: strict
+          allow: &runtime_imports
+            - $gostd
+            - github.com/Hayao0819/hytop
+            - github.com/Hayao0819/reactea/v2
+            - charm.land/bubbles/v2
+            - charm.land/bubbletea/v2
+            - charm.land/lipgloss/v2
+            - github.com/anatol/smart.go
+            - github.com/charmbracelet/colorprofile
+            - github.com/charmbracelet/x/ansi
+            - github.com/coreos/go-systemd/v22
+            - github.com/expr-lang/expr
+            - github.com/fsnotify/fsnotify
+            - github.com/go-errors/errors
+            - github.com/godbus/dbus/v5
+            - github.com/knadh/koanf
+            - github.com/moby/sys/mountinfo
+            - github.com/pelletier/go-toml/v2
+            - github.com/prometheus/procfs
+            - github.com/shirou/gopsutil/v4
+            - github.com/spf13/cobra
+            - golang.org/x/sys
+          deny:
+            - pkg: testing$
+              desc: testing must only be imported by test files
+            - pkg: github.com/pkg/errors
+              desc: use internal/errors instead
+
+        tests:
+          files: [$test]
+          list-mode: strict
+          allow: *runtime_imports
+          deny:
+            - pkg: github.com/pkg/errors
+              desc: use internal/errors instead
+
+        series-tests:
+          files: ["**/internal/domain/series/*_test.go"]
+          list-mode: lax
+          allow: ["github.com/Hayao0819/hytop/internal/domain/series$"]
+          deny: &deny_internal
+            - pkg: github.com/Hayao0819/hytop/internal
+              desc: tests must preserve the production dependency direction
+
+        safe-tests:
+          files: ["**/internal/domain/safe/*_test.go"]
+          list-mode: lax
+          allow: ["github.com/Hayao0819/hytop/internal/domain/safe$"]
+          deny: *deny_internal
+
+        diskmodel-tests:
+          files: ["**/internal/domain/diskmodel/*_test.go"]
+          list-mode: lax
+          allow: ["github.com/Hayao0819/hytop/internal/domain/diskmodel$"]
+          deny: *deny_internal
+
+        unitmodel-tests:
+          files: ["**/internal/domain/unitmodel/*_test.go"]
+          list-mode: lax
+          allow: ["github.com/Hayao0819/hytop/internal/domain/unitmodel$"]
+          deny: *deny_internal
+
+        procmodel-tests:
+          files: ["**/internal/domain/procmodel/*_test.go"]
+          list-mode: lax
+          allow: ["github.com/Hayao0819/hytop/internal/domain/procmodel$"]
+          deny: *deny_internal
+
+        errors-tests:
+          files: ["**/internal/errors/*_test.go"]
+          list-mode: lax
+          allow: ["github.com/Hayao0819/hytop/internal/errors$"]
+          deny: *deny_internal
+
+        render-tests:
+          files: ["**/internal/ui/render/*_test.go"]
+          list-mode: lax
+          allow: ["github.com/Hayao0819/hytop/internal/ui/render$"]
+          deny: *deny_internal
+
+        dialog-tests:
+          files: ["**/internal/ui/dialog/*_test.go"]
+          list-mode: lax
+          allow: ["github.com/Hayao0819/hytop/internal/ui/dialog$"]
+          deny: *deny_internal
+
+        selection-tests:
+          files: ["**/pkg/termui/selection/*_test.go"]
+          list-mode: lax
+          allow: ["github.com/Hayao0819/hytop/pkg/termui/selection$"]
+          deny: *deny_internal
+
+        metric-tests:
+          files: ["**/internal/domain/metric/*_test.go"]
+          list-mode: lax
+          allow:
+            - github.com/Hayao0819/hytop/internal/domain/metric$
+            - github.com/Hayao0819/hytop/internal/domain/series$
+          deny: *deny_internal
+
+        filter-tests:
+          files: ["**/internal/domain/filter/*_test.go"]
+          list-mode: lax
+          allow:
+            - github.com/Hayao0819/hytop/internal/domain/filter$
+            - github.com/Hayao0819/hytop/internal/domain/procmodel$
+          deny: *deny_internal
+
+        collect-tests:
+          files:
+            - "**/internal/collect/**/*_test.go"
+            - "!**/internal/collect/*_test.go"
+            - "!**/internal/collect/diskusage/*_test.go"
+            - "!**/internal/collect/filesystem/*_test.go"
+            - "!**/internal/collect/sysread/*_test.go"
+          list-mode: lax
+          allow:
+            - github.com/Hayao0819/hytop/internal/collect$
+            - github.com/Hayao0819/hytop/internal/collect/sysread$
+            - github.com/Hayao0819/hytop/internal/domain
+            - github.com/Hayao0819/hytop/internal/errors$
+          deny: *deny_internal
+
+        collect-root-tests:
+          files: ["**/internal/collect/*_test.go"]
+          list-mode: lax
+          allow:
+            - github.com/Hayao0819/hytop/internal/collect$
+            - github.com/Hayao0819/hytop/internal/domain
+            - github.com/Hayao0819/hytop/internal/errors$
+          deny: *deny_internal
+
+        diskusage-tests:
+          files: ["**/internal/collect/diskusage/*_test.go"]
+          list-mode: lax
+          allow:
+            - github.com/Hayao0819/hytop/internal/collect/diskusage$
+            - github.com/Hayao0819/hytop/internal/collect$
+            - github.com/Hayao0819/hytop/internal/collect/sysread$
+            - github.com/Hayao0819/hytop/internal/domain
+            - github.com/Hayao0819/hytop/internal/errors$
+          deny: *deny_internal
+
+        filesystem-tests:
+          files: ["**/internal/collect/filesystem/*_test.go"]
+          list-mode: lax
+          allow:
+            - github.com/Hayao0819/hytop/internal/collect/filesystem$
+            - github.com/Hayao0819/hytop/internal/collect$
+            - github.com/Hayao0819/hytop/internal/collect/sysread$
+            - github.com/Hayao0819/hytop/internal/domain
+            - github.com/Hayao0819/hytop/internal/errors$
+          deny: *deny_internal
+
+        sysread-tests:
+          files: ["**/internal/collect/sysread/*_test.go"]
+          list-mode: lax
+          allow: ["github.com/Hayao0819/hytop/internal/collect/sysread$"]
+          deny: *deny_internal
+
+        store-tests:
+          files: ["**/internal/store/*_test.go"]
+          list-mode: lax
+          allow:
+            - github.com/Hayao0819/hytop/internal/store$
+            - github.com/Hayao0819/hytop/internal/domain
+          deny: *deny_internal
+
+        chart-tests:
+          files: ["**/pkg/termui/chart/*_test.go"]
+          list-mode: lax
+          allow:
+            - github.com/Hayao0819/hytop/pkg/termui/chart$
+          deny: *deny_internal
+
+        timeseries-tests:
+          files: ["**/pkg/termui/timeseries/*_test.go"]
+          list-mode: lax
+          allow: ["github.com/Hayao0819/hytop/pkg/termui/timeseries$"]
+          deny: *deny_internal
+
+        theme-tests:
+          files: ["**/internal/ui/theme/*_test.go"]
+          list-mode: lax
+          allow:
+            - github.com/Hayao0819/hytop/internal/ui/theme$
+            - github.com/Hayao0819/hytop/internal/ui/render$
+            - github.com/Hayao0819/hytop/internal/errors$
+          deny: *deny_internal
+
+        keymap-tests:
+          files: ["**/internal/ui/keymap/*_test.go"]
+          list-mode: lax
+          allow:
+            - github.com/Hayao0819/hytop/internal/ui/keymap$
+            - github.com/Hayao0819/hytop/internal/errors$
+          deny: *deny_internal
+
+        config-tests:
+          files: ["**/internal/conf/*_test.go"]
+          list-mode: lax
+          allow:
+            - github.com/Hayao0819/hytop/internal/conf$
+            - github.com/Hayao0819/hytop/internal/domain
+            - github.com/Hayao0819/hytop/internal/errors$
+            - github.com/Hayao0819/hytop/internal/ui/keymap$
+            - github.com/Hayao0819/hytop/internal/ui/render$
+            - github.com/Hayao0819/hytop/internal/ui/theme$
+          deny: *deny_internal
+
+        widget-tests:
+          files: ["**/internal/ui/widget/**/*_test.go"]
+          list-mode: lax
+          allow:
+            - github.com/Hayao0819/hytop/internal/conf$
+            - github.com/Hayao0819/hytop/internal/domain
+            - github.com/Hayao0819/hytop/internal/errors$
+            - github.com/Hayao0819/hytop/internal/store$
+            - github.com/Hayao0819/hytop/pkg/termui/chart$
+            - github.com/Hayao0819/hytop/internal/ui/keymap$
+            - github.com/Hayao0819/hytop/internal/ui/render$
+            - github.com/Hayao0819/hytop/internal/ui/theme$
+            - github.com/Hayao0819/hytop/internal/ui/widget
+          deny: *deny_internal
+
+        page-tests:
+          files: ["**/internal/ui/page/*_test.go"]
+          list-mode: lax
+          allow:
+            - github.com/Hayao0819/hytop/internal/conf$
+            - github.com/Hayao0819/hytop/internal/domain
+            - github.com/Hayao0819/hytop/internal/errors$
+            - github.com/Hayao0819/hytop/internal/store$
+            - github.com/Hayao0819/hytop/internal/ui
+          deny: *deny_internal
+
+        app-tests:
+          files: ["**/internal/app/*_test.go"]
+          list-mode: lax
+          allow:
+            - github.com/Hayao0819/hytop/internal/app$
+            - github.com/Hayao0819/hytop/internal/collect$
+            - github.com/Hayao0819/hytop/internal/conf$
+            - github.com/Hayao0819/hytop/internal/domain
+            - github.com/Hayao0819/hytop/internal/errors$
+            - github.com/Hayao0819/hytop/internal/store$
+            - github.com/Hayao0819/hytop/internal/ui
+          deny: *deny_internal
+
+        command-tests:
+          files: ["**/internal/cmd/*_test.go"]
+          list-mode: lax
+          allow:
+            - github.com/Hayao0819/hytop/internal/app$
+            - github.com/Hayao0819/hytop/internal/cmd$
+            - github.com/Hayao0819/hytop/internal/collect
+            - github.com/Hayao0819/hytop/internal/conf$
+            - github.com/Hayao0819/hytop/internal/domain
+            - github.com/Hayao0819/hytop/internal/errors$
+            - github.com/Hayao0819/hytop/internal/store$
+            - github.com/Hayao0819/hytop/internal/ui
+          deny: *deny_internal
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters: [dupl, gocognit, gocyclo]

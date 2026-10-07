@@ -1,0 +1,103 @@
+// Package metric stores timestamped measurements at multiple resolutions.
+package metric
+
+import (
+	"time"
+
+	"github.com/Hayao0819/hytop/internal/domain/series"
+)
+
+type Sample struct {
+	Key   series.Key
+	Value float64
+	Time  time.Time
+}
+
+type Point struct {
+	Time  time.Time
+	Value float64
+}
+
+// compactPoint avoids storing the 24-byte time.Time in each history slot.
+type compactPoint struct {
+	unixNano int64
+	value    float64
+}
+
+// Rings grow lazily because most possible device series never fill every tier.
+type ring struct {
+	points []compactPoint
+	limit  int
+	next   int
+}
+
+const initialRing = 64
+
+func newRing(limit int) *ring {
+	if limit < 1 {
+		limit = 1
+	}
+
+	return &ring{points: make([]compactPoint, 0, min(initialRing, limit)), limit: limit}
+}
+
+func (r *ring) push(p Point) {
+	compact := compactPoint{unixNano: p.Time.UnixNano(), value: p.Value}
+
+	if len(r.points) < r.limit {
+		r.points = append(r.points, compact)
+		if len(r.points) == r.limit {
+			r.next = 0
+		}
+
+		return
+	}
+
+	r.points[r.next] = compact
+	r.next = (r.next + 1) % len(r.points)
+}
+
+func (r *ring) len() int { return len(r.points) }
+
+func (r *ring) rawAt(i int) compactPoint {
+	if len(r.points) < r.limit {
+		return r.points[i]
+	}
+
+	return r.points[(r.next+i)%len(r.points)]
+}
+
+func (r *ring) at(i int) Point {
+	p := r.rawAt(i)
+
+	return Point{Time: time.Unix(0, p.unixNano), Value: p.value}
+}
+
+func (r *ring) since(t time.Time, dst []Point) []Point {
+	n := r.len()
+	cutoff := t.UnixNano()
+
+	start := 0
+	for start < n && r.rawAt(start).unixNano < cutoff {
+		start++
+	}
+
+	for i := start; i < n; i++ {
+		dst = append(dst, r.at(i))
+	}
+
+	return dst
+}
+
+func (r *ring) reset() {
+	r.points = r.points[:0]
+	r.next = 0
+}
+
+func (r *ring) last() (Point, bool) {
+	if r.len() == 0 {
+		return Point{}, false
+	}
+
+	return r.at(r.len() - 1), true
+}

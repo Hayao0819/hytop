@@ -1,0 +1,5 @@
+/hytop
+/build/
+/dist/
+/coverage.out
+go.work.sum

@@ -1,0 +1,134 @@
+version: 1
+
+threshold:
+  compliance: 100
+  coverage: 100
+
+# Package names use arch-go's dot-separated glob syntax. The trailing wildcard
+# on the root rule is intentional: arch-go only adds an end anchor to patterns
+# containing a wildcard, so this matches the root command without covering all
+# descendants and hiding unclassified packages from the coverage threshold.
+dependenciesRules:
+  - package: "github.com.Hayao0819.hytop*"
+    shouldOnlyDependsOn:
+      internal: ["**.internal.cmd", "**.internal.version"]
+
+  - package: "**.pkg.termui.**"
+    shouldNotDependsOn:
+      internal: ["**.internal.**"]
+
+  - package: "**.internal.domain.series"
+    shouldNotDependsOn: &no_internal
+      internal: ["**.internal.**"]
+  - package: "**.internal.domain.safe"
+    shouldNotDependsOn: *no_internal
+  - package: "**.internal.domain.diskmodel"
+    shouldNotDependsOn: *no_internal
+  - package: "**.internal.domain.unitmodel"
+    shouldNotDependsOn: *no_internal
+  - package: "**.internal.domain.procmodel"
+    shouldNotDependsOn: *no_internal
+  - package: "**.internal.errors"
+    shouldNotDependsOn: *no_internal
+  - package: "**.internal.version"
+    shouldNotDependsOn: *no_internal
+  - package: "**.internal.ui.render"
+    shouldNotDependsOn: *no_internal
+  - package: "**.internal.ui.dialog"
+    shouldNotDependsOn: *no_internal
+
+  - package: "**.internal.domain.metric"
+    shouldOnlyDependsOn:
+      internal: ["**.internal.domain.series"]
+  - package: "**.internal.domain.filter"
+    shouldOnlyDependsOn:
+      internal: ["**.internal.domain.procmodel"]
+
+  - package: "**.internal.collect.**"
+    shouldOnlyDependsOn:
+      internal:
+        - "**.internal.collect"
+        - "**.internal.collect.sysread"
+        - "**.internal.domain.**"
+        - "**.internal.errors"
+
+  - package: "**.internal.store"
+    shouldOnlyDependsOn:
+      internal: ["**.internal.domain.**"]
+
+  - package: "**.internal.ui.theme"
+    shouldOnlyDependsOn:
+      internal:
+        - "**.internal.ui.render"
+        - "**.internal.errors"
+  - package: "**.internal.ui.keymap"
+    shouldOnlyDependsOn:
+      internal: ["**.internal.errors"]
+
+  - package: "**.internal.conf"
+    shouldOnlyDependsOn:
+      internal:
+        - "**.internal.domain.**"
+        - "**.internal.errors"
+        - "**.internal.ui.keymap"
+        - "**.internal.ui.render"
+        - "**.internal.ui.theme"
+
+  - package: "**.internal.ui.widget"
+    shouldOnlyDependsOn:
+      internal:
+        - "**.internal.domain.metric"
+        - "**.internal.errors"
+        - "**.pkg.termui.timeseries"
+  - package: "**.internal.ui.widget.**"
+    shouldOnlyDependsOn:
+      internal:
+        - "**.internal.conf"
+        - "**.internal.domain.**"
+        - "**.internal.errors"
+        - "**.internal.store"
+        - "**.internal.ui.keymap"
+        - "**.internal.ui.render"
+        - "**.internal.ui.theme"
+        - "**.internal.ui.widget"
+        - "**.pkg.termui.chart"
+        - "**.pkg.termui.timeseries"
+
+  - package: "**.internal.ui.page"
+    shouldOnlyDependsOn:
+      internal:
+        - "**.internal.conf"
+        - "**.internal.domain.**"
+        - "**.internal.errors"
+        - "**.internal.store"
+        - "**.internal.ui.dialog"
+        - "**.internal.ui.keymap"
+        - "**.internal.ui.render"
+        - "**.internal.ui.theme"
+        - "**.internal.ui.widget.**"
+        - "**.pkg.termui.chart"
+        - "**.pkg.termui.selection"
+
+  - package: "**.internal.app"
+    shouldOnlyDependsOn:
+      internal:
+        - "**.internal.collect"
+        - "**.internal.conf"
+        - "**.internal.domain.**"
+        - "**.internal.errors"
+        - "**.internal.store"
+        - "**.internal.ui.**"
+        - "**.internal.version"
+        - "**.pkg.termui.chart"
+
+  - package: "**.internal.cmd"
+    shouldOnlyDependsOn:
+      internal:
+        - "**.internal.app"
+        - "**.internal.collect.**"
+        - "**.internal.collect"
+        - "**.internal.conf"
+        - "**.internal.domain.**"
+        - "**.internal.errors"
+        - "**.internal.store"
+        - "**.internal.ui.**"

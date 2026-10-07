@@ -1,0 +1,52 @@
+version: 2
+project_name: hytop
+
+builds:
+  - main: .
+    binary: hytop
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+      - "386"
+      - riscv64
+    ignore:
+      - goos: darwin
+        goarch: "386"
+      - goos: darwin
+        goarch: riscv64
+      - goos: windows
+        goarch: "386"
+      - goos: windows
+        goarch: riscv64
+    flags:
+      - -trimpath
+    ldflags:
+      - >-
+        -s -w
+        -X github.com/Hayao0819/hytop/internal/version.Version={{.Version}}
+        -X github.com/Hayao0819/hytop/internal/version.Commit={{.Commit}}
+        -X github.com/Hayao0819/hytop/internal/version.Date={{.Date}}
+
+archives:
+  - formats:
+      - tar.gz
+    files:
+      - LICENSE
+      - README.md
+      - THIRD_PARTY_LICENSES
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  use: github-native
