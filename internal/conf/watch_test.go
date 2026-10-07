@@ -149,7 +149,7 @@ func TestWatcherReloadsAfterAWrite(t *testing.T) {
 
 	go func() { _ = watcher.Run(ctx) }()
 
-	got := waitForReload(t, watcher, func() {
+	got := waitForReload(t, watcher, 9*time.Minute, func() {
 		write(t, path, "[general]\nspan = \"9m\"\n")
 	})
 	if want := 9 * time.Minute; time.Duration(got.General.Span) != want {
@@ -171,7 +171,7 @@ func TestWatcherNoticesAConfigurationDirectoryCreatedLater(t *testing.T) {
 	defer cancel()
 	go func() { _ = watcher.Run(ctx) }()
 
-	got := waitForReload(t, watcher, func() {
+	got := waitForReload(t, watcher, 9*time.Minute, func() {
 		write(t, path, "[general]\nspan = \"9m\"\n")
 		write(t, filepath.Join(root, ".wake"), time.Now().String())
 	})
@@ -180,14 +180,17 @@ func TestWatcherNoticesAConfigurationDirectoryCreatedLater(t *testing.T) {
 	}
 }
 
-func waitForReload(t *testing.T, watcher *conf.Watcher, stimulate func()) conf.Config {
+func waitForReload(t *testing.T, watcher *conf.Watcher, span time.Duration, stimulate func()) conf.Config {
 	t.Helper()
 
+	stimulate()
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
-		stimulate()
 		if watcher.Generation() > 0 {
-			return watcher.Config()
+			got := watcher.Config()
+			if time.Duration(got.General.Span) == span {
+				return got
+			}
 		}
 		time.Sleep(20 * time.Millisecond)
 	}

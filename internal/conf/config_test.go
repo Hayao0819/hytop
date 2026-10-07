@@ -528,21 +528,23 @@ func floatPointer(value float64) *float64 { return &value }
 func TestDiscoverFollowsXDG(t *testing.T) {
 	t.Parallel()
 
-	env := map[string]string{"XDG_CONFIG_HOME": "/x", "HOME": "/home/someone"}
+	xdg := filepath.Join(string(filepath.Separator), "x")
+	home := filepath.Join(string(filepath.Separator), "home", "someone")
+	env := map[string]string{"XDG_CONFIG_HOME": xdg, "HOME": home}
 	sources := conf.Discover("", "server", func(key string) string { return env[key] })
 
-	if want := "/x/hytop/config.toml"; sources.User != want {
+	if want := filepath.Join(xdg, "hytop", "config.toml"); sources.User != want {
 		t.Errorf("User = %q, want %q", sources.User, want)
 	}
 
-	if want := "/x/hytop/profiles/server.toml"; sources.Profile != want {
+	if want := filepath.Join(xdg, "hytop", "profiles", "server.toml"); sources.Profile != want {
 		t.Errorf("Profile = %q, want %q", sources.Profile, want)
 	}
 
 	delete(env, "XDG_CONFIG_HOME")
 
 	sources = conf.Discover("", "", func(key string) string { return env[key] })
-	if want := "/home/someone/.config/hytop/config.toml"; sources.User != want {
+	if want := filepath.Join(home, ".config", "hytop", "config.toml"); sources.User != want {
 		t.Errorf("User = %q, want %q", sources.User, want)
 	}
 

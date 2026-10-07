@@ -49,11 +49,12 @@ func ResampleFunc[T any](
 		}
 
 		elapsed := at.Sub(start)
-		if elapsed < 0 || elapsed >= span {
+		if elapsed < 0 || elapsed > span {
 			continue
 		}
 
 		slot := int(float64(elapsed) / float64(span) * float64(slots))
+		slot = min(slot, slots-1)
 		if slot >= 0 && slot < slots {
 			sums[slot] += value
 			counts[slot]++

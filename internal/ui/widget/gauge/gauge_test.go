@@ -21,7 +21,8 @@ func TestGaugeShowsValueAndThresholdWithoutRelyingOnColour(t *testing.T) {
 	t.Parallel()
 
 	memory := store.New(metric.DefaultResolutions())
-	memory.WriteSamples([]metric.Sample{{Key: "cpu.total.usage", Value: 75, Time: time.Now()}})
+	now := time.Now()
+	memory.WriteSamples([]metric.Sample{{Key: "cpu.total.usage", Value: 75, Time: now}})
 	caps := render.Caps{Glyphs: render.ASCII, Colors: render.Mono}
 	widget := gaugewidget.New(memory, theme.Build(caps, nil), caps, "cpu.total.usage")
 	widget.Unit = series.Percent
@@ -38,7 +39,7 @@ func TestGaugeShowsValueAndThresholdWithoutRelyingOnColour(t *testing.T) {
 		t.Errorf("gauge width = %d, want 20", width)
 	}
 
-	memory.WriteSamples([]metric.Sample{{Key: "cpu.total.usage", Value: 95, Time: time.Now()}})
+	memory.WriteSamples([]metric.Sample{{Key: "cpu.total.usage", Value: 95, Time: now.Add(time.Second)}})
 	if got := testkit.Plain(program); !strings.Contains(got, "◆ 95 %") {
 		t.Errorf("critical gauge = %q", got)
 	}

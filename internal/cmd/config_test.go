@@ -13,6 +13,7 @@ import (
 func TestConfigWriteNeedsAUserDirectoryOrExplicitPath(t *testing.T) {
 	t.Setenv("HOME", "")
 	t.Setenv("XDG_CONFIG_HOME", "")
+	t.Setenv("APPDATA", "")
 
 	root := New("test")
 	root.SetArgs([]string{"config", "write"})

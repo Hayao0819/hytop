@@ -3,6 +3,7 @@ package filter
 import (
 	"errors"
 	"os"
+	"os/user"
 	"strconv"
 	"strings"
 )
@@ -14,7 +15,16 @@ func EnvVars() Vars {
 		"PPID": strconv.Itoa(os.Getppid()),
 	}
 
-	if name := os.Getenv("USER"); name != "" {
+	name := os.Getenv("USER")
+	if name == "" {
+		if current, err := user.Current(); err == nil {
+			name = current.Username
+		}
+	}
+	if name == "" {
+		name = os.Getenv("USERNAME")
+	}
+	if name != "" {
 		vars["USER"] = name
 	}
 

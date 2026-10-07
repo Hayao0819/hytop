@@ -47,6 +47,17 @@ func TestResampleFuncAcceptsApplicationPointTypes(t *testing.T) {
 	}
 }
 
+func TestResampleIncludesAReadingAtTheRightEdge(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(100, 0)
+	values := timeseries.Resample([]timeseries.Point{{Time: now, Value: 7}}, now, 10*time.Second, 5)
+
+	if values[4] != 7 {
+		t.Fatalf("Resample() = %v, want the current reading in the last slot", values)
+	}
+}
+
 func TestResampleHandlesLongSpansAndInvalidReadings(t *testing.T) {
 	t.Parallel()
 
