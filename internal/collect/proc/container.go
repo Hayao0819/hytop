@@ -3,22 +3,34 @@
 package proc
 
 import (
+	"bytes"
 	"strings"
 	"unicode"
-
-	"github.com/prometheus/procfs"
 )
 
-// containerOf derives a stable container identity from kernel cgroup names
-// without querying a runtime for every process.
-func containerOf(groups []procfs.Cgroup) (runtime, key string) {
-	for _, group := range groups {
-		if runtime, id := containerPath(group.Path); id != "" {
-			return runtime, runtime + ":" + shortID(id)
+func cgroupInfo(contents []byte) (first, runtime, key string) {
+	for line := range bytes.SplitSeq(contents, []byte{'\n'}) {
+		_, rest, ok := bytes.Cut(line, []byte{':'})
+		if !ok {
+			continue
+		}
+		_, rawPath, ok := bytes.Cut(rest, []byte{':'})
+		if !ok {
+			continue
+		}
+
+		path := string(rawPath)
+		if first == "" {
+			first = path
+		}
+		if runtime == "" {
+			if found, id := containerPath(path); id != "" {
+				runtime, key = found, found+":"+shortID(id)
+			}
 		}
 	}
 
-	return "", ""
+	return first, runtime, key
 }
 
 func containerPath(path string) (runtime, id string) {

@@ -4,8 +4,6 @@ package proc
 
 import (
 	"testing"
-
-	"github.com/prometheus/procfs"
 )
 
 func TestContainerIdentityFromCgroup(t *testing.T) {
@@ -26,10 +24,28 @@ func TestContainerIdentityFromCgroup(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.path, func(t *testing.T) {
-			runtime, key := containerOf([]procfs.Cgroup{{Path: test.path}})
+			path, runtime, key := cgroupInfo([]byte("0::" + test.path + "\n"))
+			if path != test.path {
+				t.Fatalf("cgroupInfo(%q) path = %q", test.path, path)
+			}
 			if runtime != test.runtime || key != test.key {
-				t.Fatalf("containerOf(%q) = %q, %q", test.path, runtime, key)
+				t.Fatalf("cgroupInfo(%q) = %q, %q", test.path, runtime, key)
 			}
 		})
+	}
+}
+
+func TestCgroupInfoUsesFirstPathAndFindsContainerInLaterHierarchy(t *testing.T) {
+	t.Parallel()
+
+	id := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	contents := []byte("2:cpu:/system.slice/work.service\n1:memory:/docker/" + id + "\n")
+
+	path, runtime, key := cgroupInfo(contents)
+	if path != "/system.slice/work.service" {
+		t.Fatalf("path = %q", path)
+	}
+	if runtime != "docker" || key != "docker:0123456789ab" {
+		t.Fatalf("container = %q, %q", runtime, key)
 	}
 }

@@ -4,10 +4,13 @@
 package proc
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"math"
 	"os"
 	"os/user"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -26,7 +29,9 @@ const kthreaddPID = 2
 
 type Collector struct {
 	fs   procfs.FS
+	root string
 	self int
+	read [4096]byte
 
 	clockTicks float64
 	pageSize   uint64
@@ -61,6 +66,7 @@ func New(root string, self int) (*Collector, error) {
 
 	return &Collector{
 		fs:         fs,
+		root:       root,
 		self:       self,
 		clockTicks: 100,
 		pageSize:   uint64(os.Getpagesize()),
@@ -212,8 +218,8 @@ func (c *Collector) build(p procfs.Proc, stat procfs.ProcStat, cpu float64) proc
 		proc.Exe = safe.Text(exe)
 	}
 
-	if status, err := p.NewStatus(); err == nil && len(status.UIDs) > 0 {
-		proc.UID = uid(status.UIDs[0])
+	if value, ok := readStatusUID(c.procFile(p.PID, "status"), c.read[:]); ok {
+		proc.UID = uid(value)
 		proc.User = c.username(proc.UID)
 	}
 
@@ -225,13 +231,91 @@ func (c *Collector) build(p procfs.Proc, stat procfs.ProcStat, cpu float64) proc
 		proc.IORd, proc.IOWr = io.ReadBytes, io.WriteBytes
 	}
 
-	if cgroups, err := p.Cgroups(); err == nil && len(cgroups) > 0 {
-		proc.Cgroup = cgroups[0].Path
+	if contents, err := readSmallFile(c.procFile(p.PID, "cgroup"), c.read[:]); err == nil {
+		proc.Cgroup, proc.Runtime, proc.Container = cgroupInfo(contents)
 		proc.Unit = unitOf(proc.Cgroup)
-		proc.Runtime, proc.Container = containerOf(cgroups)
 	}
 
 	return proc
+}
+
+func (c *Collector) procFile(pid int, name string) string {
+	return filepath.Join(c.root, strconv.Itoa(pid), name)
+}
+
+func readStatusUID(path string, scratch []byte) (uint64, bool) {
+	file, err := os.Open(path)
+	if err != nil {
+		return 0, false
+	}
+	defer func() { _ = file.Close() }()
+
+	read := 0
+	for read < len(scratch) {
+		n, readErr := file.Read(scratch[read:])
+		read += n
+		if value, ok := statusUID(scratch[:read]); ok {
+			return value, true
+		}
+		if readErr != nil || n == 0 {
+			return 0, false
+		}
+	}
+
+	return 0, false
+}
+
+func readSmallFile(path string, scratch []byte) ([]byte, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = file.Close() }()
+
+	n, err := io.ReadFull(file, scratch)
+	if err == io.EOF || err == io.ErrUnexpectedEOF {
+		return scratch[:n], nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	rest, err := io.ReadAll(file)
+	if err != nil {
+		return nil, err
+	}
+	contents := make([]byte, n+len(rest))
+	copy(contents, scratch[:n])
+	copy(contents[n:], rest)
+
+	return contents, nil
+}
+
+func statusUID(contents []byte) (uint64, bool) {
+	for line := range bytes.SplitSeq(contents, []byte{'\n'}) {
+		value, ok := bytes.CutPrefix(line, []byte("Uid:"))
+		if !ok {
+			continue
+		}
+
+		start := 0
+		for start < len(value) && (value[start] == ' ' || value[start] == '\t') {
+			start++
+		}
+		end := start
+		for end < len(value) && value[end] >= '0' && value[end] <= '9' {
+			end++
+		}
+		if start == end {
+			return 0, false
+		}
+
+		parsed, err := strconv.ParseUint(string(value[start:end]), 10, 64)
+
+		return parsed, err == nil
+	}
+
+	return 0, false
 }
 
 func (c *Collector) username(uid int64) string {

@@ -7,6 +7,8 @@ import (
 	"errors"
 	"math"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -33,6 +35,52 @@ func TestUIDSaturatesInvalidValues(t *testing.T) {
 	}
 	if got := uid(math.MaxUint64); got != math.MaxInt64 {
 		t.Fatalf("uid(max) = %d, want %d", got, int64(math.MaxInt64))
+	}
+}
+
+func TestStatusUIDReadsTheRealUID(t *testing.T) {
+	t.Parallel()
+
+	contents := []byte("Name:\thytop\nState:\tR (running)\nUid:\t1000\t1001\t1002\t1003\n")
+	got, ok := statusUID(contents)
+	if !ok || got != 1000 {
+		t.Fatalf("statusUID() = %d, %v, want 1000, true", got, ok)
+	}
+
+	for _, invalid := range [][]byte{
+		[]byte("Name:\thytop\n"),
+		[]byte("Uid:\n"),
+		[]byte("Uid:\tinvalid\n"),
+	} {
+		if got, ok := statusUID(invalid); ok {
+			t.Errorf("statusUID(%q) = %d, true", invalid, got)
+		}
+	}
+}
+
+func TestProcFileReaders(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	status := filepath.Join(dir, "status")
+	if err := os.WriteFile(status, []byte("Name:\thytop\nState:\tR\nUid:\t1000\t1000\t1000\t1000\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := readStatusUID(status, make([]byte, 128)); !ok || got != 1000 {
+		t.Fatalf("readStatusUID() = %d, %v", got, ok)
+	}
+
+	want := strings.Repeat("0123456789", 1000)
+	path := filepath.Join(dir, "long")
+	if err := os.WriteFile(path, []byte(want), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := readSmallFile(path, make([]byte, 128))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != want {
+		t.Fatalf("readSmallFile() read %d bytes, want %d", len(got), len(want))
 	}
 }
 
