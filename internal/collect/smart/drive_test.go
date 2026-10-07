@@ -3,9 +3,10 @@
 package smart
 
 import (
+	"errors"
+	"fmt"
 	"math"
 	"os"
-	"strings"
 	"testing"
 	"time"
 
@@ -104,25 +105,38 @@ func TestApplyNVMeConvertsHealthLog(t *testing.T) {
 	}
 }
 
-func TestReasonNamesPrivilegeAndStaysOnOneLine(t *testing.T) {
+func TestReasonClassifiesErrorsAndStaysOnOneLine(t *testing.T) {
 	t.Parallel()
 
-	if os.Geteuid() == 0 {
-		t.Skip("root reads the device node instead of being refused")
+	cases := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{
+			name: "permission",
+			err:  fmt.Errorf("open device:\n%w", os.ErrPermission),
+			want: "reading SMART needs privilege: retry as administrator or grant read access to the device",
+		},
+		{
+			name: "missing device",
+			err:  fmt.Errorf("open device:\n%w", os.ErrNotExist),
+			want: "no device node to read SMART from",
+		},
+		{
+			name: "other",
+			err:  errors.New("controller:\nfailed"),
+			want: "controller: failed",
+		},
 	}
 
-	_, err := smartgo.Open("/dev/sda")
-	if err == nil {
-		t.Skip("no /dev/sda to be refused by")
-	}
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 
-	got := reason(err)
-
-	if !strings.Contains(got, "privilege") {
-		t.Errorf("reason(%v) = %q, wanted it to name privilege", err, got)
-	}
-
-	if strings.ContainsAny(got, "\n\r") {
-		t.Errorf("reason() = %q, which is more than one line", got)
+			if got := reason(test.err); got != test.want {
+				t.Errorf("reason(%v) = %q, want %q", test.err, got, test.want)
+			}
+		})
 	}
 }

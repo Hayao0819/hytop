@@ -904,8 +904,9 @@ func TestClickingATabSwitchesMode(t *testing.T) {
 	t.Parallel()
 
 	program, _, _ := fixture(t)
+	modes := page.Modes()
 
-	for _, m := range page.Modes() {
+	for _, m := range modes {
 		start, width := tabLabel(t, program, m.Title)
 
 		click(t, program, start+width/2, 0)
@@ -917,12 +918,13 @@ func TestClickingATabSwitchesMode(t *testing.T) {
 
 	mode(t, program, "Graphs")
 
-	start, _ := tabLabel(t, program, "Services")
+	target := modes[len(modes)-2]
+	start, _ := tabLabel(t, program, target.Title)
 
 	click(t, program, start-1, 0)
 
-	if got := program.Route(); got != "/services" {
-		t.Errorf("clicking the number went to %q", got)
+	if got := program.Route(); !target.Holds(got) {
+		t.Errorf("clicking the number for %s went to %q", target.Title, got)
 	}
 
 	mode(t, program, "Graphs")
@@ -1000,22 +1002,33 @@ func TestSettingsSitsApartFromWhatIsWatched(t *testing.T) {
 	t.Parallel()
 
 	program, _, _ := fixture(t)
+	modes := page.Modes()
 
-	bar := []rune(strings.Split(plain(program), "\n")[0])
+	bar := strings.Split(plain(program), "\n")[0]
 
-	at := strings.Index(string(bar), "Settings")
+	at := strings.Index(bar, "Settings")
 	if at < 0 {
-		t.Fatalf("no settings tab:\n%s", string(bar))
+		t.Fatalf("no settings tab:\n%s", bar)
 	}
 
-	for _, watched := range []string{"Graphs", "Processes", "Services", "Disk"} {
-		if strings.Index(string(bar), watched) > at {
-			t.Errorf("%q is drawn after Settings:\n%s", watched, string(bar))
+	var last page.Mode
+	for _, watched := range modes {
+		if watched.Right {
+			continue
 		}
+
+		watchedAt := strings.Index(bar, watched.Title)
+		if watchedAt < 0 {
+			t.Fatalf("no %s tab:\n%s", watched.Title, bar)
+		}
+		if watchedAt > at {
+			t.Errorf("%q is drawn after Settings:\n%s", watched.Title, bar)
+		}
+		last = watched
 	}
 
-	if gap := at - strings.Index(string(bar), "Disk") - len("Disk"); gap < 4 {
-		t.Errorf("only %d cells between the watched tabs and Settings:\n%s", gap, string(bar))
+	if gap := at - strings.Index(bar, last.Title) - len(last.Title); gap < 4 {
+		t.Errorf("only %d cells between the watched tabs and Settings:\n%s", gap, bar)
 	}
 
 	press(t, program, "0")
@@ -1024,9 +1037,17 @@ func TestSettingsSitsApartFromWhatIsWatched(t *testing.T) {
 		t.Errorf("route = %q, want 0 to reach the settings", got)
 	}
 
-	press(t, program, "4")
+	var disk page.Mode
+	for _, available := range modes {
+		if available.Title == "Disk" {
+			disk = available
+			break
+		}
+	}
 
-	if got := program.Route(); got != "/disk/filesystems" {
-		t.Errorf("route = %q, want 4 to reach the disk", got)
+	press(t, program, keymap.Default().Keys(keymap.Global, keymap.Mode)[disk.Slot])
+
+	if got := program.Route(); !disk.Holds(got) {
+		t.Errorf("route = %q, want the disk key to reach the disk", got)
 	}
 }
