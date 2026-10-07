@@ -29,7 +29,11 @@ type Collector struct {
 	previous map[string]reading
 	mu       sync.RWMutex
 	activity map[string]uint64
+	links    sysfs.NetClass
+	linksAt  time.Time
 }
+
+const linkRefresh = 5 * time.Second
 
 func New(root, sysRoot string) (*Collector, error) {
 	fs, err := procfs.NewFS(root)
@@ -52,7 +56,7 @@ func (c *Collector) Interfaces() []string {
 	if err != nil {
 		return nil
 	}
-	links, _ := c.sys.NetClass()
+	links := c.linkState(time.Now())
 
 	c.mu.RLock()
 	activity := maps.Clone(c.activity)
@@ -120,6 +124,23 @@ func speed(link sysfs.NetClassIface) (float64, bool) {
 	return float64(*link.Speed) * 1e6, true
 }
 
+func (c *Collector) linkState(now time.Time) sysfs.NetClass {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	age := now.Sub(c.linksAt)
+	if c.links != nil && age >= 0 && age < linkRefresh {
+		return c.links
+	}
+
+	links, err := c.sys.NetClass()
+	if err == nil {
+		c.links, c.linksAt = links, now
+	}
+
+	return c.links
+}
+
 func (c *Collector) Check() collect.Availability {
 	_, err := c.fs.NetDev()
 
@@ -131,7 +152,7 @@ func (c *Collector) Collect(_ context.Context, now time.Time) ([]metric.Sample, 
 	if err != nil {
 		return nil, errors.Wrap(err, "reading /proc/net/dev")
 	}
-	links, _ := c.sys.NetClass()
+	links := c.linkState(now)
 
 	var (
 		samples                    []metric.Sample

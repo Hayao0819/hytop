@@ -86,6 +86,32 @@ func TestCounterResetStartsANewRateBaseline(t *testing.T) {
 	t.Fatalf("new baseline did not produce the next rate: %v", samples)
 }
 
+func TestLinkStateAvoidsReparsingSysfsOnEverySample(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	sysRoot := t.TempDir()
+	mustWrite(t, filepath.Join(sysRoot, "class", "net", "eth0", "carrier"), "1\n")
+	mustWrite(t, filepath.Join(sysRoot, "class", "net", "eth0", "speed"), "2500\n")
+
+	collector, err := New(root, sysRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := time.Unix(100, 0)
+	if got, ok := speed(collector.linkState(start)["eth0"]); !ok || got != 2.5e9 {
+		t.Fatalf("initial speed = %v, %v", got, ok)
+	}
+
+	mustWrite(t, filepath.Join(sysRoot, "class", "net", "eth0", "speed"), "1000\n")
+	if got, _ := speed(collector.linkState(start.Add(time.Second))["eth0"]); got != 2.5e9 {
+		t.Fatalf("cached speed = %v, want 2.5e9", got)
+	}
+	if got, _ := speed(collector.linkState(start.Add(linkRefresh))["eth0"]); got != 1e9 {
+		t.Fatalf("refreshed speed = %v, want 1e9", got)
+	}
+}
+
 func TestInterfacesPreferCurrentTrafficOverLifetimeTotals(t *testing.T) {
 	t.Parallel()
 
