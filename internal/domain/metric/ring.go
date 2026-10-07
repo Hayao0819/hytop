@@ -31,20 +31,23 @@ type ring struct {
 	next   int
 }
 
-const initialRing = 64
+const initialRing = 8
 
 func newRing(limit int) *ring {
 	if limit < 1 {
 		limit = 1
 	}
 
-	return &ring{points: make([]compactPoint, 0, min(initialRing, limit)), limit: limit}
+	return &ring{limit: limit}
 }
 
 func (r *ring) push(p Point) {
 	compact := compactPoint{unixNano: p.Time.UnixNano(), value: p.Value}
 
 	if len(r.points) < r.limit {
+		if len(r.points) == cap(r.points) {
+			r.grow()
+		}
 		r.points = append(r.points, compact)
 		if len(r.points) == r.limit {
 			r.next = 0
@@ -55,6 +58,18 @@ func (r *ring) push(p Point) {
 
 	r.points[r.next] = compact
 	r.next = (r.next + 1) % len(r.points)
+}
+
+func (r *ring) grow() {
+	capacity := initialRing
+	if current := cap(r.points); current > 0 {
+		capacity = current * 2
+	}
+	capacity = min(capacity, r.limit)
+
+	points := make([]compactPoint, len(r.points), capacity)
+	copy(points, r.points)
+	r.points = points
 }
 
 func (r *ring) len() int { return len(r.points) }
