@@ -152,3 +152,13 @@ func (s *Series) pick(span time.Duration) int {
 func (s *Series) Last() (Point, bool) { return s.tiers[0].ring.last() }
 
 func (s *Series) Len() int { return s.tiers[0].ring.len() }
+
+// Retention is the longest window retained by the series.
+func (s *Series) Retention() time.Duration {
+	var retention time.Duration
+	for _, tier := range s.tiers {
+		retention = max(retention, tier.resolution.Retention)
+	}
+
+	return retention
+}

@@ -17,6 +17,7 @@ import (
 type Store struct {
 	mu          sync.RWMutex
 	resolutions []metric.Resolution
+	policies    []Policy
 	series      map[series.Key]*metric.Series
 	keys        []series.Key
 	procs       *procmodel.Snapshot
@@ -28,7 +29,18 @@ type Store struct {
 	nextSweep   time.Time
 }
 
+// Policy assigns a different history budget to a subset of series.
+type Policy struct {
+	Pattern     series.Pattern
+	Resolutions []metric.Resolution
+}
+
 func New(resolutions []metric.Resolution) *Store {
+	return NewWithPolicies(resolutions)
+}
+
+// NewWithPolicies creates a store with ordered, first-match history policies.
+func NewWithPolicies(resolutions []metric.Resolution, policies ...Policy) *Store {
 	if len(resolutions) == 0 {
 		resolutions = metric.DefaultResolutions()
 	}
@@ -40,13 +52,35 @@ func New(resolutions []metric.Resolution) *Store {
 
 	return &Store{
 		resolutions: resolutions,
+		policies:    policies,
 		series:      make(map[series.Key]*metric.Series),
 		procs:       procmodel.NewSnapshot(nil),
 		facts:       make(map[string]string),
 		factOwners:  make(map[string]string),
 		sourceFacts: make(map[string]map[string]struct{}),
-		retention:   retention,
+		retention:   max(retention, policyRetention(policies)),
 	}
+}
+
+func policyRetention(policies []Policy) time.Duration {
+	var retention time.Duration
+	for _, policy := range policies {
+		for _, resolution := range policy.Resolutions {
+			retention = max(retention, resolution.Retention)
+		}
+	}
+
+	return retention
+}
+
+func (s *Store) resolutionsFor(key series.Key) []metric.Resolution {
+	for _, policy := range s.policies {
+		if policy.Pattern.Match(key) {
+			return policy.Resolutions
+		}
+	}
+
+	return s.resolutions
 }
 
 func (s *Store) WriteSamples(samples []metric.Sample) {
@@ -62,7 +96,7 @@ func (s *Store) WriteSamples(samples []metric.Sample) {
 
 		history, ok := s.series[sample.Key]
 		if !ok {
-			history = metric.NewSeries(s.resolutions)
+			history = metric.NewSeries(s.resolutionsFor(sample.Key))
 			s.series[sample.Key] = history
 			s.keys = append(s.keys, sample.Key)
 
@@ -85,13 +119,11 @@ func (s *Store) prune(now time.Time) {
 
 	interval := min(time.Minute, max(time.Second, s.retention/4))
 	s.nextSweep = now.Add(interval)
-	cutoff := now.Add(-s.retention)
-
 	kept := s.keys[:0]
 	for _, key := range s.keys {
 		history := s.series[key]
 		last, ok := history.Last()
-		if !ok || last.Time.Before(cutoff) {
+		if !ok || last.Time.Before(now.Add(-history.Retention())) {
 			delete(s.series, key)
 
 			continue

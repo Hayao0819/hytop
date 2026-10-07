@@ -66,3 +66,28 @@ func TestUnchangedFactsDoNotAdvanceTheGeneration(t *testing.T) {
 		t.Fatal("an unchanged fact replacement advanced the generation")
 	}
 }
+
+func TestHistoryPoliciesOnlyExtendMatchingSeries(t *testing.T) {
+	t.Parallel()
+
+	memory := store.NewWithPolicies(
+		[]metric.Resolution{{Interval: time.Second, Retention: 2 * time.Second}},
+		store.Policy{
+			Pattern:     "battery.*.capacity",
+			Resolutions: []metric.Resolution{{Interval: time.Second, Retention: 10 * time.Second}},
+		},
+	)
+	origin := time.Unix(100, 0)
+	memory.WriteSamples([]metric.Sample{
+		{Key: "cpu.total.usage", Value: 50, Time: origin},
+		{Key: "battery.0.capacity", Value: 80, Time: origin},
+	})
+	memory.WriteSamples([]metric.Sample{{Key: "clock", Value: 1, Time: origin.Add(5 * time.Second)}})
+
+	if _, ok := memory.Last("cpu.total.usage"); ok {
+		t.Fatal("default-retention series survived past its policy")
+	}
+	if point, ok := memory.Last("battery.0.capacity"); !ok || point.Value != 80 {
+		t.Fatalf("battery series = %v, %v", point, ok)
+	}
+}
