@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/Hayao0819/reactea/v2"
 	"github.com/Hayao0819/reactea/v2/modal"
@@ -24,16 +23,18 @@ const wordmark = ` _           _
        |___/          |_|`
 
 type about struct {
-	reactea.BasicComponent
+	scrollView
 
-	theme  *theme.Theme
-	keys   *keymap.Map
-	info   version.Info
-	offset int
+	theme *theme.Theme
+	info  version.Info
 }
 
 func newAbout(t *theme.Theme, keys *keymap.Map, info version.Info) *about {
-	return &about{theme: t, keys: keys, info: info}
+	return &about{
+		scrollView: scrollView{keys: keys, scope: keymap.AboutScreen},
+		theme:      t,
+		info:       info,
+	}
 }
 
 func aboutPlacement(ctx *reactea.Ctx) modal.Placement {
@@ -48,21 +49,6 @@ func modalExtent(available, preferred int) int {
 	}
 
 	return min(available, preferred)
-}
-
-func (a *about) Update(ctx *reactea.Ctx, msg tea.Msg) tea.Cmd {
-	switch {
-	case a.keys.Is(msg, keymap.AboutScreen, keymap.Cancel):
-		return modal.Dismiss(ctx)
-
-	case a.keys.Is(msg, keymap.AboutScreen, keymap.Down):
-		a.offset++
-
-	case a.keys.Is(msg, keymap.AboutScreen, keymap.Up):
-		a.offset = max(0, a.offset-1)
-	}
-
-	return nil
 }
 
 func (a *about) Render(ctx *reactea.Ctx) string {
@@ -104,13 +90,8 @@ func (a *about) Render(ctx *reactea.Ctx) string {
 	)
 
 	bodyHeight := max(0, ctx.Height()-4)
-	visible := scroll(body, &a.offset, bodyHeight)
-	footer := " esc/q/i close "
-
-	if len(body) > bodyHeight {
-		footer = fmt.Sprintf(" %d–%d / %d   j/k scroll   esc close ",
-			min(a.offset+1, len(body)), min(a.offset+len(visible), len(body)), len(body))
-	}
+	visible := a.window(body, bodyHeight)
+	footer := a.footer(len(body), len(visible))
 
 	lines := append(
 		[]string{heading.Width(inner).Align(lipgloss.Center).Render("about hytop · " + safe.Text(a.info.Version))},

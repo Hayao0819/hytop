@@ -35,9 +35,9 @@ func (c *Cursor) Reveal(visible, total int) {
 	switch {
 	case c.Selected < c.Offset:
 		c.Offset = c.Selected
-	case c.Selected >= c.Offset+visible:
+	case c.Selected-c.Offset >= visible:
 		c.Offset = c.Selected - visible + 1
 	}
 
-	c.Offset = min(max(c.Offset, 0), max(0, total-visible))
+	c.Offset, _ = Window(c.Offset, visible, total)
 }

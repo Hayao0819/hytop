@@ -120,6 +120,7 @@ dependenciesRules:
         - "**.internal.ui.**"
         - "**.internal.version"
         - "**.pkg.termui.chart"
+        - "**.pkg.termui.selection"
 
   - package: "**.internal.cmd"
     shouldOnlyDependsOn:

@@ -11,6 +11,7 @@ import (
 	"github.com/Hayao0819/hytop/internal/ui/keymap"
 	"github.com/Hayao0819/hytop/internal/ui/render"
 	"github.com/Hayao0819/hytop/internal/ui/theme"
+	"github.com/Hayao0819/hytop/pkg/termui/selection"
 )
 
 // Setting describes one adjustable value and its choices.
@@ -162,8 +163,9 @@ func (s *Settings) Render(ctx *reactea.Ctx) string {
 	} else if selectedLine >= s.offset+bodyHeight {
 		s.offset = selectedLine - bodyHeight + 1
 	}
-	s.offset = min(max(s.offset, 0), max(0, len(lines)-bodyHeight))
-	body := settingsWindow(lines, s.offset, bodyHeight)
+	start, end := selection.Window(s.offset, bodyHeight, len(lines))
+	s.offset = start
+	body := slices.Clone(lines[start:end])
 	for len(body) < bodyHeight {
 		body = append(body, "")
 	}
@@ -184,14 +186,6 @@ func (s *Settings) Render(ctx *reactea.Ctx) string {
 	footer = append(footer, s.theme.Style(theme.Dim).Render(" "+s.footer()+position))
 
 	return strings.Join(append(body, footer...), "\n")
-}
-
-func settingsWindow(lines []string, offset, height int) []string {
-	if offset >= len(lines) || height <= 0 {
-		return nil
-	}
-
-	return slices.Clone(lines[offset:min(offset+height, len(lines))])
 }
 
 func btoi(ok bool) int {

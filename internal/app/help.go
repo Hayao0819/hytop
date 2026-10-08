@@ -1,13 +1,10 @@
 package app
 
 import (
-	"fmt"
 	"strings"
 
-	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/Hayao0819/reactea/v2"
-	"github.com/Hayao0819/reactea/v2/modal"
 
 	"github.com/Hayao0819/hytop/internal/domain/filter"
 	"github.com/Hayao0819/hytop/internal/ui/dialog"
@@ -17,27 +14,11 @@ import (
 
 // help derives its labels from the active keymap.
 type help struct {
-	reactea.BasicComponent
-
-	keys   *keymap.Map
-	offset int
+	scrollView
 }
 
-func newHelp(keys *keymap.Map) *help { return &help{keys: keys} }
-
-func (h *help) Update(ctx *reactea.Ctx, msg tea.Msg) tea.Cmd {
-	switch {
-	case h.keys.Is(msg, keymap.HelpScreen, keymap.Cancel):
-		return modal.Dismiss(ctx)
-
-	case h.keys.Is(msg, keymap.HelpScreen, keymap.Down):
-		h.offset++
-
-	case h.keys.Is(msg, keymap.HelpScreen, keymap.Up):
-		h.offset = max(0, h.offset-1)
-	}
-
-	return nil
+func newHelp(keys *keymap.Map) *help {
+	return &help{scrollView: scrollView{keys: keys, scope: keymap.HelpScreen}}
 }
 
 func (h *help) Render(ctx *reactea.Ctx) string {
@@ -67,22 +48,11 @@ func (h *help) Render(ctx *reactea.Ctx) string {
 
 	// Keep the title outside the scrolling region.
 	bodyHeight := max(0, ctx.Height()-4)
-	body := scroll(lines[1:], &h.offset, bodyHeight)
-	position := fmt.Sprintf(" %d–%d / %d   j/k scroll   esc close ",
-		min(h.offset+1, len(lines)-1), min(h.offset+len(body), len(lines)-1), len(lines)-1)
+	body := h.window(lines[1:], bodyHeight)
+	position := h.footer(len(lines)-1, len(body))
 	body = append(body, dim.Width(inner).Align(lipgloss.Right).Render(position))
 
 	return dialog.Frame(ctx, nil, strings.Join(append(lines[:1], body...), "\n"))
-}
-
-func scroll(lines []string, offset *int, height int) []string {
-	*offset = max(0, min(*offset, len(lines)-height))
-
-	if *offset >= len(lines) {
-		return nil
-	}
-
-	return lines[*offset:min(*offset+height, len(lines))]
 }
 
 func pad(s string, width int) string {

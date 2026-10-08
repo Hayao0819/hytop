@@ -10,6 +10,7 @@ import (
 	"github.com/Hayao0819/hytop/internal/domain/unitmodel"
 	"github.com/Hayao0819/hytop/internal/ui/render"
 	"github.com/Hayao0819/hytop/internal/ui/theme"
+	"github.com/Hayao0819/hytop/pkg/termui/selection"
 )
 
 type logPane struct {
@@ -76,7 +77,7 @@ func (p *logPane) Scroll(by int) {
 		total = len(p.log.Entries())
 	}
 
-	p.offset = min(max(p.offset+by, 0), max(0, total-max(1, p.room)))
+	p.offset, _ = selection.Window(p.offset+by, max(1, p.room), total)
 }
 
 // Lines returns the visible journal window, newest last and padded to height.
@@ -93,7 +94,7 @@ func (p *logPane) Lines(width, height int) []string {
 
 	entries := p.log.Entries()
 
-	offset := min(p.offset, max(0, len(entries)-height))
+	offset, _ := selection.Window(p.offset, height, len(entries))
 	end := len(entries) - offset
 	start := max(0, end-height)
 

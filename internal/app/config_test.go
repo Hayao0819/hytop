@@ -349,3 +349,42 @@ func TestTheHelpIsGeneratedFromTheKeymap(t *testing.T) {
 		t.Errorf("scrolling did not reach the end of the help:\n%s", got)
 	}
 }
+
+func TestScrollableModalsUseTheirConfiguredKeys(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		scope string
+		open  string
+		title string
+		last  string
+	}{
+		{"help", "?", "hytop  keys", "operators:"},
+		{"about", "i", "about hytop", "https://twitter.com/Hayao0819"},
+	} {
+		t.Run(tc.scope, func(t *testing.T) {
+			c := settings(t)
+			c.Keys = map[string][]string{
+				tc.scope + ".down":   {"ctrl+n"},
+				tc.scope + ".up":     {"ctrl+p"},
+				tc.scope + ".cancel": {"ctrl+x"},
+			}
+			program, _, _ := fixtureWith(t, func(env *app.Env) { env.Config = c })
+			program.Send(tea.WindowSizeMsg{Width: 100, Height: 10})
+			press(t, program, tc.open)
+			if got := plain(program); !strings.Contains(got, "ctrl+n/ctrl+p scroll") || !strings.Contains(got, "ctrl+x close") {
+				t.Fatalf("modal footer does not show its configured keys:\n%s", got)
+			}
+			for range 200 {
+				press(t, program, "ctrl+n")
+			}
+			if got := plain(program); !strings.Contains(got, tc.last) {
+				t.Fatalf("configured scroll key did not reach the last lines:\n%s", got)
+			}
+			press(t, program, "ctrl+x")
+			if got := plain(program); strings.Contains(got, tc.title) {
+				t.Fatalf("configured cancel key did not close the modal:\n%s", got)
+			}
+		})
+	}
+}
