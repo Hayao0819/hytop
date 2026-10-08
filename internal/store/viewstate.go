@@ -97,6 +97,17 @@ func (v *ViewState) SetSelected(i int) {
 	v.selectedID = procmodel.Identity{}
 }
 
+func (v *ViewState) ResetSelection() {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+
+	v.resetSelection()
+}
+
+func (v *ViewState) resetSelection() {
+	v.selected, v.selectedID, v.offset = 0, procmodel.Identity{}, 0
+}
+
 func (v *ViewState) SelectProcess(index int, id procmodel.Identity) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
@@ -110,7 +121,7 @@ func (v *ViewState) ReconcileProcesses(ids []procmodel.Identity) int {
 	defer v.mu.Unlock()
 
 	if len(ids) == 0 {
-		v.selected, v.selectedID, v.offset = 0, procmodel.Identity{}, 0
+		v.resetSelection()
 
 		return 0
 	}
@@ -270,8 +281,7 @@ func (v *ViewState) PushFilter(src string, expr filter.Expr) {
 
 	v.stack = append(v.stack, v.filterSrc)
 	v.filterSrc, v.filterExpr = src, expr
-	v.selected, v.offset = 0, 0
-	v.selectedID = procmodel.Identity{}
+	v.resetSelection()
 }
 
 func (v *ViewState) PopFilter() (string, bool) {

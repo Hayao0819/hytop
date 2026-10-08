@@ -239,15 +239,13 @@ func (p *Processes) update(ctx *reactea.Ctx, msg tea.Msg) tea.Cmd {
 
 	case p.keys.Is(msg, scope, keymap.ToggleKernel):
 		p.view.ToggleKernel()
-		p.view.SetSelected(0)
-		p.view.SetOffset(0)
+		p.view.ResetSelection()
 
 		return nil
 
 	case p.keys.Is(msg, scope, keymap.ToggleTree):
 		p.view.ToggleTree()
-		p.view.SetSelected(0)
-		p.view.SetOffset(0)
+		p.view.ResetSelection()
 
 		return nil
 
@@ -373,7 +371,7 @@ func (p *Processes) back() tea.Cmd {
 	}
 
 	p.view.SetFilter(previous, expr)
-	p.view.SetSelected(0)
+	p.view.ResetSelection()
 
 	return nil
 }

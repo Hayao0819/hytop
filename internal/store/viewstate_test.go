@@ -96,3 +96,20 @@ func TestViewStateTransitions(t *testing.T) {
 		t.Fatal("explicit setters did not disable state")
 	}
 }
+
+func TestResetSelectionStopsFollowingThePreviousProcess(t *testing.T) {
+	t.Parallel()
+
+	state := store.NewViewState()
+	ids := []procmodel.Identity{{PID: 1, Started: 1}, {PID: 42, Started: 7}}
+	state.SelectProcess(1, ids[1])
+	state.SetOffset(1)
+	state.ResetSelection()
+
+	if state.Selected() != 0 || state.Offset() != 0 {
+		t.Fatalf("reset selection = %d, %d", state.Selected(), state.Offset())
+	}
+	if got := state.ReconcileProcesses(ids); got != 0 {
+		t.Fatalf("selection still follows the previous process at row %d", got)
+	}
+}
