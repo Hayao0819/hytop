@@ -130,9 +130,7 @@ func NewStorage(env Env, mounts Mounts, drives Drives, refresh RefreshDrives, sc
 	d.box = layout.Row(
 		layout.Fixed(14, rail).Key(railItem).Focusable(),
 		layout.Spacer(1),
-		layout.Fixed(1, reactea.Func(func(ctx *reactea.Ctx) string {
-			return divider(env.Theme, ctx.Height())
-		})),
+		verticalRule(env.Theme),
 		layout.Spacer(1),
 		layout.Grow(4, d.pages).Key(paneItem).Focusable(),
 	)
@@ -141,9 +139,7 @@ func NewStorage(env Env, mounts Mounts, drives Drives, refresh RefreshDrives, sc
 
 	d.Wrapper = reactea.Wrap(layout.Column(
 		layout.Fixed(summary.Rows, d.head),
-		layout.Fixed(1, reactea.Func(func(ctx *reactea.Ctx) string {
-			return rule(env.Theme, ctx.Width())
-		})),
+		horizontalRule(env.Theme),
 		layout.Grow(1, d.box).Focusable(),
 	))
 

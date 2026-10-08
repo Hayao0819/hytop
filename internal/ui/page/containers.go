@@ -58,9 +58,7 @@ func NewContainers(env Env) *Containers {
 	c.box = layout.Row(
 		layout.Grow(24, reactea.Func(c.renderList)).Bounds(34, 42).Key(containerListItem).Focusable(),
 		layout.Spacer(1),
-		layout.Fixed(1, reactea.Func(func(ctx *reactea.Ctx) string {
-			return divider(env.Theme, ctx.Height())
-		})),
+		verticalRule(env.Theme),
 		layout.Spacer(1),
 		layout.Grow(1, c.table).Key(containerProcItem).Focusable(),
 	)
@@ -68,7 +66,7 @@ func NewContainers(env Env) *Containers {
 
 	c.Wrapper = reactea.Wrap(layout.Column(
 		layout.Fixed(1, reactea.Func(c.renderTitle)),
-		layout.Fixed(1, reactea.Func(func(ctx *reactea.Ctx) string { return rule(env.Theme, ctx.Width()) })),
+		horizontalRule(env.Theme),
 		layout.Grow(1, c.box).Focusable(),
 	))
 
@@ -101,22 +99,14 @@ func (c *Containers) Update(ctx *reactea.Ctx, msg tea.Msg) tea.Cmd {
 	if !c.inside() {
 		containers := c.containers()
 
-		switch {
-		case c.keys.Is(msg, keymap.Containers, keymap.EnterPane):
+		if c.keys.Is(msg, keymap.Containers, keymap.EnterPane) {
 			if len(containers) > 0 {
 				c.box.FocusKey(containerProcItem)
 			}
 
 			return nil
-		case c.keys.Is(msg, keymap.Containers, keymap.Down):
-			c.cursor.Move(1, len(containers))
-		case c.keys.Is(msg, keymap.Containers, keymap.Up):
-			c.cursor.Move(-1, len(containers))
-		case c.keys.Is(msg, keymap.Containers, keymap.Top):
-			c.cursor.Top()
-		case c.keys.Is(msg, keymap.Containers, keymap.Bottom):
-			c.cursor.Bottom(len(containers))
-		default:
+		}
+		if !moveCursor(msg, c.keys, keymap.Containers, &c.cursor, len(containers)) {
 			return c.Wrapper.Update(ctx, msg)
 		}
 
@@ -170,8 +160,7 @@ func (c *Containers) selectContainer(key string) {
 
 	expr, _ := filter.Compile(src)
 	c.view.SetFilter(src, expr)
-	c.view.SetSelected(0)
-	c.view.SetOffset(0)
+	c.view.ResetSelection()
 }
 
 func (c *Containers) renderTitle(ctx *reactea.Ctx) string {

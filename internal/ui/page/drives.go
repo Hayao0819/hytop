@@ -83,18 +83,10 @@ func (d *drives) Update(ctx *reactea.Ctx, msg tea.Msg) tea.Cmd {
 		})
 	}
 
-	total := len(d.list())
-
-	switch {
-	case d.keys.Is(msg, keymap.Disk, keymap.Down):
-		d.cursor.Move(1, total)
-	case d.keys.Is(msg, keymap.Disk, keymap.Up):
-		d.cursor.Move(-1, total)
-	case d.keys.Is(msg, keymap.Disk, keymap.Top):
-		d.cursor.Top()
-	case d.keys.Is(msg, keymap.Disk, keymap.Bottom):
-		d.cursor.Bottom(total)
-	case d.keys.Is(msg, keymap.Drives, keymap.Elevate):
+	if moveCursor(msg, d.keys, keymap.Disk, &d.cursor, len(d.list())) {
+		return nil
+	}
+	if d.keys.Is(msg, keymap.Drives, keymap.Elevate) {
 		if d.refresh != nil && !d.load.Loading() && d.needsPrivilege() {
 			return modal.PushAt(ctx,
 				newPasswordDialog(d.theme, d.keys, "Read SMART information from the drives"),

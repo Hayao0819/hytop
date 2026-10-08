@@ -60,9 +60,7 @@ func NewServices(env Env, list func() []unitmodel.Unit, follow func() LogFollowe
 
 	s.box = layout.Column(
 		layout.Fixed(summary.Rows, s.head),
-		layout.Fixed(1, reactea.Func(func(ctx *reactea.Ctx) string {
-			return rule(env.Theme, ctx.Width())
-		})),
+		horizontalRule(env.Theme),
 		layout.Grow(1, reactea.Func(s.render)).Focusable(),
 		layout.Fixed(1, s.bar).Focusable(),
 	)

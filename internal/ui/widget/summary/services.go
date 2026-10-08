@@ -23,15 +23,12 @@ func NewServices(s *store.Store, t *theme.Theme, caps render.Caps) *Services {
 }
 
 func (w *Services) Render(ctx *reactea.Ctx) string {
-	width := ctx.Width()
-	if width <= 0 {
-		return ""
-	}
-
-	return strings.Join([]string{
-		w.line(width, w.units(), w.state()),
-		w.line(width, w.work(), w.boot()),
-	}, "\n")
+	return w.render(ctx, func(int) [][2]string {
+		return [][2]string{
+			{w.units(), w.state()},
+			{w.work(), w.boot()},
+		}
+	})
 }
 
 func (w *Services) units() string {

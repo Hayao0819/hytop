@@ -44,20 +44,12 @@ func (f *filesystems) Update(ctx *reactea.Ctx, msg tea.Msg) tea.Cmd {
 		return cmd
 	}
 
-	switch {
-	case f.keys.Is(msg, keymap.Disk, keymap.Open):
+	if f.keys.Is(msg, keymap.Disk, keymap.Open) {
 		if f.cursor.Selected < rows && f.open != nil {
 			return f.open(ctx, mounts[f.cursor.Selected].Path)
 		}
-
-	case f.keys.Is(msg, keymap.Disk, keymap.Down):
-		f.cursor.Move(1, rows)
-	case f.keys.Is(msg, keymap.Disk, keymap.Up):
-		f.cursor.Move(-1, rows)
-	case f.keys.Is(msg, keymap.Disk, keymap.Top):
-		f.cursor.Top()
-	case f.keys.Is(msg, keymap.Disk, keymap.Bottom):
-		f.cursor.Bottom(rows)
+	} else {
+		moveCursor(msg, f.keys, keymap.Disk, &f.cursor, rows)
 	}
 
 	return nil

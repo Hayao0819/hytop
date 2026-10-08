@@ -150,19 +150,11 @@ func (u *usage) Update(ctx *reactea.Ctx, msg tea.Msg) tea.Cmd {
 
 	entries := u.scanner.Scan().Entries
 
+	if moveCursor(msg, u.keys, keymap.Usage, &u.cursor, len(entries)) {
+		return nil
+	}
+
 	switch {
-	case u.keys.Is(msg, keymap.Usage, keymap.Down):
-		u.cursor.Move(1, len(entries))
-
-	case u.keys.Is(msg, keymap.Usage, keymap.Up):
-		u.cursor.Move(-1, len(entries))
-
-	case u.keys.Is(msg, keymap.Usage, keymap.Top):
-		u.cursor.Top()
-
-	case u.keys.Is(msg, keymap.Usage, keymap.Bottom):
-		u.cursor.Bottom(len(entries))
-
 	case u.keys.Is(msg, keymap.Usage, keymap.Open):
 		return u.enter(entries)
 

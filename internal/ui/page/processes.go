@@ -51,9 +51,7 @@ func NewProcesses(env Env, follow func() LogFollower) *Processes {
 	p.bar = newFilterBar(env, "/", p.apply, p.source, func() { p.box.FocusFirst() })
 	p.head = summary.New(env.Store, env.Theme, env.Caps)
 
-	p.rule = layout.Fixed(1, reactea.Func(func(ctx *reactea.Ctx) string {
-		return rule(env.Theme, ctx.Width())
-	}))
+	p.rule = horizontalRule(env.Theme)
 
 	p.box = layout.Column()
 	p.shaped = p.view.Logs()

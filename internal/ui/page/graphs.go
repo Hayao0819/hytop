@@ -2,7 +2,6 @@ package page
 
 import (
 	"fmt"
-	"strings"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/Hayao0819/reactea/v2"
@@ -40,9 +39,7 @@ func NewGraphs(env Env) *Graphs {
 	g.Wrapper = reactea.Wrap(layout.Row(
 		layout.Grow(1, g.rail).Bounds(16, 22),
 		layout.Spacer(1),
-		layout.Fixed(1, reactea.Func(func(ctx *reactea.Ctx) string {
-			return divider(env.Theme, ctx.Height())
-		})),
+		verticalRule(env.Theme),
 		layout.Spacer(1),
 		layout.Grow(4, g.pages).Focusable(),
 	))
@@ -188,19 +185,4 @@ func (g *Graphs) step(ctx *reactea.Ctx, by int) tea.Cmd {
 	next := (current + by + len(g.specs)) % len(g.specs)
 
 	return ctx.SetRoute(g.specs[next].Route)
-}
-
-func rule(t *theme.Theme, width int) string {
-	return t.Style(theme.Border).Render(strings.Repeat("─", max(0, width)))
-}
-
-func divider(t *theme.Theme, height int) string {
-	rule := t.Style(theme.Border).Render("│")
-
-	lines := make([]string, max(0, height))
-	for i := range lines {
-		lines[i] = rule
-	}
-
-	return strings.Join(lines, "\n")
 }
