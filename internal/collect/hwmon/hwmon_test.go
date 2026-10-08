@@ -61,4 +61,29 @@ func TestCollectorNamesAndScalesSensorChannels(t *testing.T) {
 			t.Errorf("%s = %v, want %v; samples=%v", key, got[key], want, got)
 		}
 	}
+	facts, err := collector.Facts(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := facts["power.nct_6775_power1.watts.source"], filepath.Join(dir, "power1"); got != want {
+		t.Fatalf("power source = %q, want %q", got, want)
+	}
+
+	write(t, filepath.Join(dir, "power1_average"), "invalid\n")
+	samples, err = collector.Collect(t.Context(), time.Unix(2, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	count := 0
+	for _, sample := range samples {
+		if sample.Key == "power.nct_6775_power1.watts" {
+			count++
+			if sample.Value != 25 {
+				t.Fatalf("fallback power = %v, want 25", sample.Value)
+			}
+		}
+	}
+	if count != 1 {
+		t.Fatalf("got %d fallback power samples, want one", count)
+	}
 }

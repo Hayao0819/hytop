@@ -3,6 +3,7 @@ package sysread
 
 import (
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -37,4 +38,18 @@ func Float(path string) (float64, bool) {
 	n, err := strconv.ParseFloat(value, 64)
 
 	return n, err == nil
+}
+
+// SensorSource resolves sysfs aliases without reading a sensor value.
+func SensorSource(dir, channel string) string {
+	if dir == "" {
+		return ""
+	}
+
+	target, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		return ""
+	}
+
+	return filepath.Join(target, channel)
 }

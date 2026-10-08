@@ -2,6 +2,7 @@ package page
 
 import (
 	"fmt"
+	"slices"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/Hayao0819/reactea/v2"
@@ -57,6 +58,17 @@ func (g *Graphs) refresh() bool {
 	if g.env.GPUs != nil {
 		gpuIndices = g.env.GPUs()
 	}
+	var batteryIndices []int
+	if g.env.Batteries != nil {
+		batteryIndices = g.env.Batteries()
+	}
+	if keys := powerSeries(g.env.Store); len(batteryIndices) == 0 && len(keys) > 0 {
+		specs = append(specs, GraphSpec{
+			Title: "Power", Route: "/graphs/power", Key: keys[0],
+			Unit: series.Watts, Token: theme.CPU, Sources: keys,
+			Build: func(env Env) reactea.Component { return Power(env, keys) },
+		})
+	}
 	for _, index := range gpuIndices {
 		index := index
 		key := series.Key(fmt.Sprintf("gpu.%d.util", index))
@@ -70,10 +82,6 @@ func (g *Graphs) refresh() bool {
 			Unit: series.Percent, Token: theme.Memory, Max: 100,
 			Build: func(env Env) reactea.Component { return GPU(env, index, name) },
 		})
-	}
-	var batteryIndices []int
-	if g.env.Batteries != nil {
-		batteryIndices = g.env.Batteries()
 	}
 	for _, index := range batteryIndices {
 		index := index
@@ -125,7 +133,7 @@ func same(a, b []GraphSpec) bool {
 	}
 
 	for i := range a {
-		if a[i].Route != b[i].Route || a[i].Title != b[i].Title {
+		if a[i].Route != b[i].Route || a[i].Title != b[i].Title || !slices.Equal(a[i].Sources, b[i].Sources) {
 			return false
 		}
 	}

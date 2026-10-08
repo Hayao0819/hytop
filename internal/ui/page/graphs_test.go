@@ -66,6 +66,47 @@ func TestRenamingTheCurrentGPURemountsItsPage(t *testing.T) {
 	}
 }
 
+func TestDesktopPowerPageShowsAvailableSensorsSeparately(t *testing.T) {
+	memory := store.New(metric.DefaultResolutions())
+	now := time.Now()
+	memory.WriteSamples([]metric.Sample{
+		{Key: "cpu.package.power", Value: 35, Time: now},
+		{Key: "power.corsairpsu_power1.watts", Value: 120, Time: now},
+	})
+	program := graphProgram(memory, nil, nil, "/graphs/power")
+
+	got := testkit.Plain(program)
+	for _, want := range []string{"Power", "individual sensors; not summed", "CPU package", "corsairpsu power1"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("desktop power page does not contain %q:\n%s", want, got)
+		}
+	}
+}
+
+func TestPowerPageRemovesAHwmonAliasWhenItsSourceIsIdentified(t *testing.T) {
+	memory := store.New(metric.DefaultResolutions())
+	now := time.Now()
+	memory.WriteSamples([]metric.Sample{
+		{Key: "gpu.0.power", Value: 30, Time: now},
+		{Key: "power.amdgpu_power1.watts", Value: 30, Time: now},
+	})
+	program := graphProgram(memory, nil, nil, "/graphs/power")
+	if got := testkit.Plain(program); !strings.Contains(got, "amdgpu power1") {
+		t.Fatalf("unidentified sensor was hidden:\n%s", got)
+	}
+
+	memory.ReplaceFacts("gpu", map[string]string{
+		"gpu.name.0": "Radeon", "gpu.0.power.source": "/sys/devices/gpu0/hwmon/power1",
+	})
+	memory.ReplaceFacts("hwmon", map[string]string{
+		"power.amdgpu_power1.watts.source": "/sys/devices/gpu0/hwmon/power1",
+	})
+	program.Send(struct{}{})
+	if got := testkit.Plain(program); strings.Contains(got, "amdgpu power1") || !strings.Contains(got, "Radeon") {
+		t.Fatalf("power page did not replace the duplicate sensor with the named GPU:\n%s", got)
+	}
+}
+
 func TestBatteryPageUpdatesWithLiveReadingsAndDisappearsAfterRemoval(t *testing.T) {
 	memory := store.NewWithPolicies(metric.ResolutionsFor(24*time.Hour), store.Policy{
 		Pattern: "battery.*.capacity",

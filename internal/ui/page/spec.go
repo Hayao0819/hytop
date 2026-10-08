@@ -90,6 +90,8 @@ type GraphSpec struct {
 	Title string
 	Route string
 	Build func(Env) reactea.Component
+	// Sources remount a dynamic page when its inputs change.
+	Sources []series.Key
 
 	Key   series.Key
 	Unit  series.Unit

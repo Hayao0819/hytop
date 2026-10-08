@@ -279,6 +279,9 @@ func (c *Collector) Facts(context.Context) (collect.Facts, error) {
 		id := strconv.Itoa(card.index)
 		facts[series.FactGPUName+"."+id] = card.name
 		if !card.asleep() {
+			if source := sysread.SensorSource(card.hwmonDir(), "power1"); source != "" {
+				facts["gpu."+id+".power.source"] = source
+			}
 			link := pcieLink(card.dir, "current")
 			if link != "" {
 				facts["gpu."+id+".pcie.current"] = link

@@ -5,10 +5,11 @@ package hwmon
 
 import (
 	"context"
+	"maps"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Hayao0819/hytop/internal/collect"
@@ -18,7 +19,11 @@ import (
 	"github.com/Hayao0819/hytop/internal/errors"
 )
 
-type Collector struct{ root string }
+type Collector struct {
+	root    string
+	mu      sync.RWMutex
+	sources collect.Facts
+}
 
 func New(sysRoot string) *Collector {
 	return &Collector{root: filepath.Join(sysRoot, "class", "hwmon")}
@@ -37,7 +42,6 @@ func (c *Collector) Check() collect.Availability {
 	return collect.Availability{State: collect.Ready}
 }
 
-// reading is one sensor file: what it measures and what to divide by.
 type sensorReading struct {
 	prefix  string
 	suffix  string
@@ -63,6 +67,7 @@ func (c *Collector) Collect(_ context.Context, now time.Time) ([]metric.Sample, 
 		hottest float64
 		seen    bool
 	)
+	sources := collect.Facts{}
 
 	for _, device := range devices {
 		dir := filepath.Join(c.root, device.Name())
@@ -72,8 +77,6 @@ func (c *Collector) Collect(_ context.Context, now time.Time) ([]metric.Sample, 
 		if err != nil {
 			continue
 		}
-
-		sort.Slice(files, func(i, j int) bool { return files[i].Name() < files[j].Name() })
 
 		for _, file := range files {
 			for _, reading := range readings {
@@ -89,11 +92,13 @@ func (c *Collector) Collect(_ context.Context, now time.Time) ([]metric.Sample, 
 
 				label := labelOf(dir, file.Name(), reading.suffix)
 
+				sensorKey := key(reading.kind, chip, label)
 				samples = append(samples, metric.Sample{
-					Key:   key(reading.kind, chip, label),
+					Key:   sensorKey,
 					Value: value,
 					Time:  now,
 				})
+				reading.recordSource(sources, dir, file.Name(), sensorKey)
 
 				if reading.kind == "thermal" && value > 0 && value < 200 {
 					hottest = max(hottest, value)
@@ -106,6 +111,9 @@ func (c *Collector) Collect(_ context.Context, now time.Time) ([]metric.Sample, 
 	if seen {
 		samples = append(samples, metric.Sample{Key: "thermal.max.temp", Value: hottest, Time: now})
 	}
+	c.mu.Lock()
+	c.sources = sources
+	c.mu.Unlock()
 
 	if len(samples) == 0 {
 		return nil, errors.New("no sensor was readable")
@@ -114,10 +122,27 @@ func (c *Collector) Collect(_ context.Context, now time.Time) ([]metric.Sample, 
 	return samples, nil
 }
 
+func (c *Collector) Facts(context.Context) (collect.Facts, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return maps.Clone(c.sources), nil
+}
+
+func (r sensorReading) recordSource(facts collect.Facts, dir, file string, key series.Key) {
+	if r.kind != "power" {
+		return
+	}
+	channel := strings.TrimSuffix(file, r.suffix)
+	if source := sysread.SensorSource(dir, channel); source != "" {
+		facts[string(key)+".source"] = source
+	}
+}
+
 func (r sensorReading) read(dir, file string) (float64, bool) {
 	if r.prefix == "power" && r.suffix == "_input" {
 		channel := strings.TrimSuffix(file, r.suffix)
-		if _, ok := sysread.String(filepath.Join(dir, channel+"_average")); ok {
+		if _, ok := sysread.Float(filepath.Join(dir, channel+"_average")); ok {
 			return 0, false
 		}
 	}

@@ -187,6 +187,9 @@ func TestSysfsCollectsGTTAndHwmonDetails(t *testing.T) {
 		facts["gpu.0.pcie.max"] != "16.0 GT/s PCIe ×16" {
 		t.Fatalf("PCIe facts = %v", facts)
 	}
+	if got, want := facts["gpu.0.power.source"], filepath.Join(device, "hwmon", "hwmon0", "power1"); got != want {
+		t.Fatalf("power sensor source = %q, want %q", got, want)
+	}
 
 	for _, tc := range []struct {
 		average string

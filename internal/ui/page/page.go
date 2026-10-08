@@ -204,11 +204,6 @@ func Sensors(env Env) reactea.Component {
 	stats := statgrid.New(env.Store,
 		statgrid.Stat{Label: "Hottest", Key: "thermal.max.temp", Unit: series.Celsius, Big: true},
 		statgrid.Stat{Label: "CPU package", Key: "cpu.package.temp", Unit: series.Celsius, Big: true},
-		statgrid.Stat{Label: "Battery", Key: "battery.0.capacity", Unit: series.Percent},
-		statgrid.Stat{Label: "Battery draw", Key: "battery.0.power", Unit: series.Watts, Precision: 1},
-		statgrid.Stat{Label: "Mains", Fact: "power.ac"},
-		statgrid.Stat{Label: "Battery status", Fact: "battery.status"},
-		statgrid.Stat{Label: "Battery health", Fact: "battery.health"},
 	)
 
 	return Detail(env, "Sensors", g, stats)
