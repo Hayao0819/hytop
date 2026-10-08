@@ -30,13 +30,21 @@ type Collector struct {
 	mu               sync.RWMutex
 	batteryCount     int
 	supplies         sysfs.PowerSupplyClass
+	energy           map[string]batteryEnergyReading
 	historyAttempted bool
+}
+
+type batteryEnergyReading struct {
+	microWh int64
+	time    time.Time
+	power   float64
+	valid   bool
 }
 
 func New(sysRoot string) *Collector {
 	fs, err := sysfs.NewFS(sysRoot)
 
-	return &Collector{fs: fs, sysRoot: sysRoot, err: err}
+	return &Collector{fs: fs, sysRoot: sysRoot, err: err, energy: make(map[string]batteryEnergyReading)}
 }
 
 func (c *Collector) Check() collect.Availability {
@@ -92,15 +100,13 @@ func (c *Collector) Collect(ctx context.Context, now time.Time) ([]metric.Sample
 			samples = append(samples, metric.Sample{Key: series.Key(prefix + key), Value: value, Time: now})
 		}
 
-		if battery.Capacity != nil {
-			add("capacity", float64(*battery.Capacity))
+		if capacity, ok := batteryCapacity(battery); ok {
+			add("capacity", capacity)
 		}
 
-		// A battery reports either microwatts directly or microamps at a voltage.
-		if battery.PowerNow != nil {
-			add("power", math.Abs(float64(*battery.PowerNow)/1e6))
-		} else if battery.CurrentNow != nil && battery.VoltageNow != nil {
-			add("power", math.Abs(float64(*battery.CurrentNow)*float64(*battery.VoltageNow)/1e12))
+		power, hasPower := c.batteryPower(battery, now)
+		if hasPower {
+			add("power", power)
 		}
 
 		addMicro(add, "energy", batteryEnergyNow(battery))
@@ -110,12 +116,12 @@ func (c *Collector) Collect(ctx context.Context, now time.Time) ([]metric.Sample
 		addInt(add, "cycles", battery.CycleCount)
 		if remaining := first(battery.TimeToEmptyNow, battery.TimeToEmptyAvg); remaining != nil {
 			addInt(add, "time_to_empty", remaining)
-		} else if seconds, ok := estimatedTime(battery, false); ok {
+		} else if seconds, ok := estimatedTime(battery, false, power); ok {
 			add("time_to_empty", seconds)
 		}
 		if remaining := first(battery.TimeToFullNow, battery.TimeToFullAvg); remaining != nil {
 			addInt(add, "time_to_full", remaining)
-		} else if seconds, ok := estimatedTime(battery, true); ok {
+		} else if seconds, ok := estimatedTime(battery, true, power); ok {
 			add("time_to_full", seconds)
 		}
 
@@ -136,6 +142,57 @@ func (c *Collector) Collect(ctx context.Context, now time.Time) ([]metric.Sample
 	}
 
 	return samples, nil
+}
+
+func (c *Collector) batteryPower(battery sysfs.PowerSupply, now time.Time) (float64, bool) {
+	energy := batteryEnergyNow(battery)
+	// A battery reports either microwatts directly or microamps at a voltage.
+	var direct float64
+	var hasDirect bool
+	if reading := first(battery.PowerNow, battery.PowerAvg); reading != nil {
+		direct, hasDirect = math.Abs(float64(*reading)/1e6), true
+	} else if current, voltage := first(battery.CurrentNow, battery.CurrentAvg),
+		first(battery.VoltageNow, battery.VoltageAvg); current != nil && voltage != nil {
+		direct, hasDirect = math.Abs(float64(*current)*float64(*voltage)/1e12), true
+	}
+	if energy == nil {
+		return direct, hasDirect
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	previous, hadPrevious := c.energy[battery.Name]
+	if hasDirect {
+		c.energy[battery.Name] = batteryEnergyReading{
+			microWh: *energy, time: now, power: direct, valid: true,
+		}
+
+		return direct, true
+	}
+	if battery.Status != "" && battery.Status != "Charging" && battery.Status != "Discharging" {
+		c.energy[battery.Name] = batteryEnergyReading{microWh: *energy, time: now, valid: true}
+
+		return 0, true
+	}
+	if !hadPrevious {
+		c.energy[battery.Name] = batteryEnergyReading{microWh: *energy, time: now}
+
+		return 0, false
+	}
+	if *energy == previous.microWh {
+		return previous.power, previous.valid
+	}
+	if !now.After(previous.time) {
+		return 0, false
+	}
+
+	power := math.Abs(float64(*energy-previous.microWh)/1e6) / now.Sub(previous.time).Hours()
+	c.energy[battery.Name] = batteryEnergyReading{
+		microWh: *energy, time: now, power: power, valid: true,
+	}
+
+	return power, true
 }
 
 func (c *Collector) Facts(context.Context) (collect.Facts, error) {
@@ -261,6 +318,19 @@ func batteryEnergyNow(battery sysfs.PowerSupply) *int64 {
 	return energy(battery.EnergyNow, battery.ChargeNow, battery.VoltageNow)
 }
 
+func batteryCapacity(battery sysfs.PowerSupply) (float64, bool) {
+	if battery.Capacity != nil {
+		return float64(*battery.Capacity), true
+	}
+
+	now, full := batteryEnergyNow(battery), batteryEnergyFull(battery)
+	if now == nil || full == nil || *full <= 0 {
+		return 0, false
+	}
+
+	return min(100, max(0, 100*float64(*now)/float64(*full))), true
+}
+
 func batteryEnergyFull(battery sysfs.PowerSupply) *int64 {
 	return energy(battery.EnergyFull, battery.ChargeFull, battery.VoltageNow)
 }
@@ -292,7 +362,7 @@ func batteryHealth(battery sysfs.PowerSupply) (float64, bool) {
 	return 100 * float64(*full) / float64(*design), true
 }
 
-func estimatedTime(battery sysfs.PowerSupply, charging bool) (float64, bool) {
+func estimatedTime(battery sysfs.PowerSupply, charging bool, power float64) (float64, bool) {
 	want := "Discharging"
 	if charging {
 		want = "Charging"
@@ -301,12 +371,6 @@ func estimatedTime(battery sysfs.PowerSupply, charging bool) (float64, bool) {
 		return 0, false
 	}
 
-	power := 0.0
-	if battery.PowerNow != nil {
-		power = math.Abs(float64(*battery.PowerNow) / 1e6)
-	} else if battery.CurrentNow != nil && battery.VoltageNow != nil {
-		power = math.Abs(float64(*battery.CurrentNow) * float64(*battery.VoltageNow) / 1e12)
-	}
 	if power <= 0 {
 		return 0, false
 	}

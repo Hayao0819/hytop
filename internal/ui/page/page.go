@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
-	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -279,8 +278,5 @@ func Battery(env Env, index int, name string) reactea.Component {
 		statgrid.Stat{Label: "Mains", Fact: series.FactACOnline},
 	)
 
-	page := DetailWithFacts(env, name, g, stats, facts)
-	g.Span = 7 * 24 * time.Hour
-
-	return page
+	return DetailWithFacts(env, name, g, stats, facts)
 }

@@ -132,6 +132,77 @@ func TestMainsOnlySupplyIsAValidCollector(t *testing.T) {
 	}
 }
 
+func TestPowerFallsBackToTheEnergyDelta(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	battery := filepath.Join(root, "class", "power_supply", "BAT0")
+	write(t, battery, "type", "Battery\n")
+	write(t, battery, "energy_now", "30000000\n")
+	write(t, battery, "energy_full", "40000000\n")
+
+	collector := New(root)
+	if availability := collector.Check(); availability.State != collect.Ready {
+		t.Fatalf("Check() = %+v", availability)
+	}
+	origin := time.Unix(1_000, 0)
+	initial, err := collector.Collect(t.Context(), origin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	foundCapacity := false
+	for _, sample := range initial {
+		if sample.Key == "battery.0.capacity" && sample.Value == 75 {
+			foundCapacity = true
+		}
+	}
+	if !foundCapacity {
+		t.Fatalf("derived capacity is absent from %v", initial)
+	}
+
+	write(t, battery, "energy_now", "29990000\n")
+	samples, err := collector.Collect(t.Context(), origin.Add(time.Minute))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, sample := range samples {
+		if sample.Key == "battery.0.power" {
+			if sample.Value != 0.6 {
+				t.Fatalf("derived power = %v W, want 0.6 W", sample.Value)
+			}
+
+			samples, err = collector.Collect(t.Context(), origin.Add(2*time.Minute))
+			if err != nil {
+				t.Fatal(err)
+			}
+			heldPower := false
+			for _, held := range samples {
+				if held.Key == "battery.0.power" && held.Value == 0.6 {
+					heldPower = true
+					break
+				}
+			}
+			if !heldPower {
+				t.Fatalf("derived power was not held between energy updates: %v", samples)
+			}
+
+			write(t, battery, "status", "Full\n")
+			samples, err = collector.Collect(t.Context(), origin.Add(3*time.Minute))
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, idle := range samples {
+				if idle.Key == "battery.0.power" && idle.Value == 0 {
+					return
+				}
+			}
+			t.Fatalf("idle battery retained stale power: %v", samples)
+		}
+	}
+
+	t.Fatalf("derived battery power is absent from %v", samples)
+}
+
 func write(t *testing.T, dir, name, content string) {
 	t.Helper()
 	if err := os.MkdirAll(dir, 0o755); err != nil {

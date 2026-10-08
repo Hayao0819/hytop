@@ -66,9 +66,16 @@ func TestRenamingTheCurrentGPURemountsItsPage(t *testing.T) {
 	}
 }
 
-func TestBatteryGetsAWeeklyPageAndDisappearsAfterRemoval(t *testing.T) {
-	memory := store.New(metric.ResolutionsFor(7 * 24 * time.Hour))
-	now := time.Now()
+func TestBatteryPageUpdatesWithLiveReadingsAndDisappearsAfterRemoval(t *testing.T) {
+	memory := store.NewWithPolicies(metric.ResolutionsFor(24*time.Hour), store.Policy{
+		Pattern: "battery.*.capacity",
+		Resolutions: []metric.Resolution{
+			{Interval: time.Second, Retention: 10 * time.Minute},
+			{Interval: 10 * time.Second, Retention: 2 * time.Hour},
+			{Interval: 5 * time.Minute, Retention: 7 * 24 * time.Hour},
+		},
+	})
+	now := time.Now().Add(-20 * time.Second).Truncate(10 * time.Second)
 	samples := make([]metric.Sample, 0, 169)
 	for hour := 168; hour >= 0; hour-- {
 		samples = append(samples, metric.Sample{
@@ -83,6 +90,21 @@ func TestBatteryGetsAWeeklyPageAndDisappearsAfterRemoval(t *testing.T) {
 
 	if got := testkit.Plain(program); !strings.Contains(got, "Internal battery") || !strings.Contains(got, "% charge") {
 		t.Fatalf("battery page did not show its name and charge history:\n%s", got)
+	}
+	before := testkit.Plain(program)
+	beforeGraph, _, ok := strings.Cut(before, "Charge")
+	if !ok {
+		t.Fatalf("battery page did not render its statistics:\n%s", before)
+	}
+	memory.WriteSamples([]metric.Sample{{Key: "battery.0.capacity", Value: 95, Time: now.Add(time.Second)}})
+	program.Send(struct{}{})
+	after := testkit.Plain(program)
+	afterGraph, _, ok := strings.Cut(after, "Charge")
+	if !ok {
+		t.Fatalf("updated battery page did not render its statistics:\n%s", after)
+	}
+	if afterGraph == beforeGraph {
+		t.Fatalf("battery graph did not change after a live reading:\n%s", after)
 	}
 
 	batteries = nil
