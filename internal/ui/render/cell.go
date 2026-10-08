@@ -27,7 +27,7 @@ func Table(height int, header, empty string, count, offset int, row func(int) st
 	lines := make([]string, 0, height)
 	lines = append(lines, header)
 
-	if count == 0 && empty != "" {
+	if height > 1 && count == 0 && empty != "" {
 		lines = append(lines, empty)
 	} else {
 		for slot := 0; slot < height-1; slot++ {

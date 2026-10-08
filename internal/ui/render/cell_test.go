@@ -25,3 +25,24 @@ func TestTableClipsAndPadsAViewport(t *testing.T) {
 		t.Fatalf("negative offset Table() = %q, want %q", got, want)
 	}
 }
+
+func TestTableFitsAHeaderOnlyViewport(t *testing.T) {
+	t.Parallel()
+
+	for _, height := range []int{-1, 0, 1} {
+		for _, count := range []int{0, 1} {
+			got := render.Table(height, "head", "empty", count, 0, func(int) string {
+				t.Fatal("rendered a row without room below the header")
+
+				return ""
+			})
+			want := ""
+			if height == 1 {
+				want = "head"
+			}
+			if got != want {
+				t.Errorf("Table(height=%d, count=%d) = %q, want %q", height, count, got, want)
+			}
+		}
+	}
+}
