@@ -4,6 +4,7 @@ package filesystem
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -38,7 +39,7 @@ func (*Collector) Check() collect.Availability { return collect.Availability{Sta
 func (c *Collector) Mounts() []diskmodel.Mount {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return append([]diskmodel.Mount(nil), c.mounts...)
+	return slices.Clone(c.mounts)
 }
 
 func (c *Collector) Collect(ctx context.Context, now time.Time) ([]metric.Sample, error) {

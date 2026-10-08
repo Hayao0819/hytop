@@ -3,6 +3,7 @@ package page
 import (
 	"fmt"
 	"image/color"
+	"slices"
 	"strings"
 	"time"
 
@@ -238,7 +239,7 @@ func dashboardGauge(env Env, spec conf.Pane) (reactea.Component, error) {
 	widget.Token = token
 	widget.Scale, _ = series.ParseScale(spec.Unit)
 	widget.Precision = spec.Precision
-	widget.Threshold = append([]float64(nil), spec.Threshold...)
+	widget.Threshold = slices.Clone(spec.Threshold)
 	if env.Registry != nil {
 		widget.Unit = env.Registry.Unit(key)
 	}

@@ -187,4 +187,32 @@ func TestSysfsCollectsGTTAndHwmonDetails(t *testing.T) {
 		facts["gpu.0.pcie.max"] != "16.0 GT/s PCIe ×16" {
 		t.Fatalf("PCIe facts = %v", facts)
 	}
+
+	for _, tc := range []struct {
+		average string
+		want    float64
+	}{
+		{"9000000\n", 9},
+		{"not a number\n", 3},
+	} {
+		if err := os.WriteFile(filepath.Join(device, "hwmon", "hwmon0", "power1_average"), []byte(tc.average), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		samples, err := collector.Collect(t.Context(), time.Unix(2, 0))
+		if err != nil {
+			t.Fatal(err)
+		}
+		count := 0
+		for _, sample := range samples {
+			if sample.Key == "gpu.0.power" {
+				count++
+				if sample.Value != tc.want {
+					t.Errorf("average %q: power = %v, want %v", tc.average, sample.Value, tc.want)
+				}
+			}
+		}
+		if count != 1 {
+			t.Fatalf("average %q: got %d power samples, want one", tc.average, count)
+		}
+	}
 }

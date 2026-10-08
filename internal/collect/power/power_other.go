@@ -6,6 +6,7 @@ package power
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -84,7 +85,7 @@ func (c *Collector) Collect(_ context.Context, now time.Time) ([]metric.Sample, 
 
 func (c *Collector) Facts(context.Context) (collect.Facts, error) {
 	c.mu.RLock()
-	batteries := append([]*battery.Battery(nil), c.batteries...)
+	batteries := slices.Clone(c.batteries)
 	c.mu.RUnlock()
 
 	facts := make(collect.Facts)

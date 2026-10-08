@@ -3,6 +3,7 @@ package series
 import (
 	"fmt"
 	"math"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -93,7 +94,7 @@ func ParseScale(name string) (Scale, bool) {
 }
 
 // ScaleNames lists the spellings accepted in configuration files.
-func ScaleNames() []string { return append([]string(nil), scaleNames...) }
+func ScaleNames() []string { return slices.Clone(scaleNames) }
 
 // SupportsScale reports whether a representation preserves the meaning of the
 // measurement. Bit/byte conversion only applies to storage and transfer rates.

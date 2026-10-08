@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -81,7 +82,7 @@ func (c *Collector) refreshCards(now time.Time) ([]card, error) {
 	}
 	c.lastDiscovery = now
 	c.discoveryErr = err
-	snapshot := append([]card(nil), c.cards...)
+	snapshot := slices.Clone(c.cards)
 	c.mu.Unlock()
 
 	return snapshot, err
@@ -90,7 +91,7 @@ func (c *Collector) refreshCards(now time.Time) ([]card, error) {
 func (c *Collector) currentCards(now time.Time) ([]card, error) {
 	c.mu.RLock()
 	if now.Before(c.lastDiscovery.Add(cardDiscoveryInterval)) {
-		cards := append([]card(nil), c.cards...)
+		cards := slices.Clone(c.cards)
 		err := c.discoveryErr
 		c.mu.RUnlock()
 
@@ -105,7 +106,7 @@ func (c *Collector) cardSnapshot() []card {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	return append([]card(nil), c.cards...)
+	return slices.Clone(c.cards)
 }
 
 // find walks /sys/class/drm for cardN that has a device behind it. Rendering
@@ -178,29 +179,13 @@ func (c *Collector) Collect(ctx context.Context, now time.Time) ([]metric.Sample
 		}
 		awake = true
 
-		for _, reading := range []struct {
-			key     string
-			files   []string
-			divisor float64
-		}{
+		samples = readSamples(samples, card.dir, "gpu."+id+".", now, []sensorReading{
 			{"util", []string{"gpu_busy_percent"}, 1},
 			{"mem.used", []string{"mem_info_vram_used"}, 1},
 			{"mem.total", []string{"mem_info_vram_total"}, 1},
 			{"mem.gtt.used", []string{"mem_info_gtt_used"}, 1},
 			{"mem.gtt.total", []string{"mem_info_gtt_total"}, 1},
-		} {
-			for _, file := range reading.files {
-				if value, ok := sysread.Float(filepath.Join(card.dir, file)); ok {
-					samples = append(samples, metric.Sample{
-						Key:   series.Key("gpu." + id + "." + reading.key),
-						Value: value / reading.divisor,
-						Time:  now,
-					})
-
-					break
-				}
-			}
-		}
+		})
 
 		samples = append(samples, card.hwmon(id, now)...)
 	}
@@ -224,38 +209,17 @@ func (c *Collector) Collect(ctx context.Context, now time.Time) ([]metric.Sample
 
 // hwmon is where a DRM driver puts its temperature, power draw and clocks.
 func (c card) hwmon(id string, now time.Time) []metric.Sample {
-	root := filepath.Join(c.dir, "hwmon")
-
-	entries, err := os.ReadDir(root)
-	if err != nil || len(entries) == 0 {
+	dir := c.hwmonDir()
+	if dir == "" {
 		return nil
 	}
 
-	dir := filepath.Join(root, entries[0].Name())
-
-	var samples []metric.Sample
-
-	for _, reading := range []struct {
-		key     string
-		files   []string
-		divisor float64
-	}{
+	samples := readSamples(nil, dir, "gpu."+id+".", now, []sensorReading{
 		{"temp", []string{"temp1_input"}, 1000},
 		{"power", []string{"power1_average", "power1_input"}, 1e6},
 		{"clock", []string{"freq1_input"}, 1},
 		{"fan.rpm", []string{"fan1_input"}, 1},
-	} {
-		for _, file := range reading.files {
-			if value, ok := sysread.Float(filepath.Join(dir, file)); ok {
-				samples = append(samples, metric.Sample{
-					Key:   series.Key("gpu." + id + "." + reading.key),
-					Value: value / reading.divisor,
-					Time:  now,
-				})
-				break
-			}
-		}
-	}
+	})
 
 	for n := 1; n <= 8; n++ {
 		if label, ok := sysread.String(filepath.Join(dir, "freq"+strconv.Itoa(n)+"_label")); ok && label == "mclk" {
@@ -265,6 +229,38 @@ func (c card) hwmon(id string, now time.Time) []metric.Sample {
 				})
 			}
 			break
+		}
+	}
+
+	return samples
+}
+
+func (c card) hwmonDir() string {
+	root := filepath.Join(c.dir, "hwmon")
+
+	entries, err := os.ReadDir(root)
+	if err != nil || len(entries) == 0 {
+		return ""
+	}
+
+	return filepath.Join(root, entries[0].Name())
+}
+
+type sensorReading struct {
+	key     string
+	files   []string
+	divisor float64
+}
+
+func readSamples(samples []metric.Sample, dir, prefix string, now time.Time, readings []sensorReading) []metric.Sample {
+	for _, reading := range readings {
+		for _, file := range reading.files {
+			if value, ok := sysread.Float(filepath.Join(dir, file)); ok {
+				samples = append(samples, metric.Sample{
+					Key: series.Key(prefix + reading.key), Value: value / reading.divisor, Time: now,
+				})
+				break
+			}
 		}
 	}
 
