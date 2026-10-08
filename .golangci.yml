@@ -199,6 +199,12 @@ linters:
           allow: ["github.com/Hayao0819/hytop/pkg/termui/timeseries$"]
           deny: *deny_internal
 
+        text-tests:
+          files: ["**/pkg/termui/text/*_test.go"]
+          list-mode: lax
+          allow: ["github.com/Hayao0819/hytop/pkg/termui/text$"]
+          deny: *deny_internal
+
         theme-tests:
           files: ["**/internal/ui/theme/*_test.go"]
           list-mode: lax
