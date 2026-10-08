@@ -14,6 +14,7 @@ import (
 	"github.com/Hayao0819/reactea/v2"
 	"github.com/Hayao0819/reactea/v2/modal"
 	"github.com/Hayao0819/reactea/v2/testkit"
+	"github.com/shirou/gopsutil/v4/process"
 
 	"github.com/Hayao0819/hytop/internal/app"
 	"github.com/Hayao0819/hytop/internal/collect"
@@ -694,12 +695,22 @@ func TestSignallingWhatIsNotOursSaysSo(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("running as root, which may signal init")
 	}
+	target, err := process.NewProcess(1)
+	if err != nil {
+		t.Skipf("cannot check init's ownership: %v", err)
+	}
+	uids, err := target.UidsWithContext(t.Context())
+	if err != nil || len(uids) == 0 {
+		t.Skipf("cannot check init's ownership: uids=%v, error=%v", uids, err)
+	}
+	if int(uids[0]) == os.Geteuid() {
+		t.Skip("init belongs to the test user")
+	}
 
 	program, _, view := fixture(t)
 
 	mode(t, program, "Processes")
-	press(t, program, "p")
-
+	view.SetSortOrder(store.SortPID, false)
 	view.SetSelected(0)
 
 	press(t, program, "K")
