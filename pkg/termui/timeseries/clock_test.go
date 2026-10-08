@@ -1,14 +1,14 @@
-package metric_test
+package timeseries_test
 
 import (
 	"testing"
 	"time"
 
-	"github.com/Hayao0819/hytop/internal/domain/metric"
+	"github.com/Hayao0819/hytop/pkg/termui/timeseries"
 )
 
-func resolutions() []metric.Resolution {
-	return []metric.Resolution{
+func resolutions() []timeseries.Resolution {
+	return []timeseries.Resolution{
 		{Interval: time.Second, Retention: time.Minute},
 		{Interval: 10 * time.Second, Retention: 10 * time.Minute},
 	}
@@ -18,7 +18,7 @@ func TestAStalePointDoesNotLeakIntoTheWindow(t *testing.T) {
 	t.Parallel()
 
 	var (
-		series = metric.NewSeries(resolutions())
+		series = newSeries(t, resolutions())
 		origin = time.Now().Truncate(time.Minute)
 	)
 
@@ -42,7 +42,7 @@ func TestTheHistoryOnlyEverRunsForwards(t *testing.T) {
 	t.Parallel()
 
 	var (
-		series = metric.NewSeries(resolutions())
+		series = newSeries(t, resolutions())
 		origin = time.Now().Truncate(time.Minute)
 	)
 
@@ -67,7 +67,7 @@ func TestAClockSteppingBackStartsTheHistoryAgain(t *testing.T) {
 	t.Parallel()
 
 	var (
-		series = metric.NewSeries(resolutions())
+		series = newSeries(t, resolutions())
 		origin = time.Now().Truncate(time.Hour)
 	)
 
@@ -97,7 +97,7 @@ func TestARepeatedTimestampKeepsTheHistory(t *testing.T) {
 	t.Parallel()
 
 	var (
-		series = metric.NewSeries(resolutions())
+		series = newSeries(t, resolutions())
 		origin = time.Now().Truncate(time.Minute)
 	)
 

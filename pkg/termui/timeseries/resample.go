@@ -1,4 +1,4 @@
-// Package timeseries transforms timestamped numeric observations.
+// Package timeseries stores and resamples timestamped numeric observations.
 package timeseries
 
 import (

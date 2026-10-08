@@ -1,22 +1,6 @@
-// Package metric stores timestamped measurements at multiple resolutions.
-package metric
+package timeseries
 
-import (
-	"time"
-
-	"github.com/Hayao0819/hytop/internal/domain/series"
-)
-
-type Sample struct {
-	Key   series.Key
-	Value float64
-	Time  time.Time
-}
-
-type Point struct {
-	Time  time.Time
-	Value float64
-}
+import "time"
 
 // compactPoint avoids storing the 24-byte time.Time in each history slot.
 type compactPoint struct {
@@ -24,7 +8,6 @@ type compactPoint struct {
 	value    float64
 }
 
-// Rings grow lazily because most possible device series never fill every tier.
 type ring struct {
 	points []compactPoint
 	limit  int
@@ -63,7 +46,7 @@ func (r *ring) push(p Point) {
 func (r *ring) grow() {
 	capacity := initialRing
 	if current := cap(r.points); current > 0 {
-		capacity = current * 2
+		capacity = current + min(current, r.limit-current)
 	}
 	capacity = min(capacity, r.limit)
 
@@ -91,6 +74,13 @@ func (r *ring) at(i int) Point {
 func (r *ring) since(t time.Time, dst []Point) []Point {
 	n := r.len()
 	cutoff := t.UnixNano()
+	// Query bounds can extend beyond the compact timestamp range.
+	if restored := time.Unix(0, cutoff); !restored.Equal(t) {
+		if restored.Before(t) {
+			return dst
+		}
+		cutoff = -1 << 63
+	}
 
 	start := 0
 	for start < n && r.rawAt(start).unixNano < cutoff {

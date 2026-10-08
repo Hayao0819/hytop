@@ -39,7 +39,7 @@ dependenciesRules:
 
   - package: "**.internal.domain.metric"
     shouldOnlyDependsOn:
-      internal: ["**.internal.domain.series"]
+      internal: ["**.internal.domain.series", "**.pkg.termui.timeseries"]
   - package: "**.internal.domain.filter"
     shouldOnlyDependsOn:
       internal: ["**.internal.domain.procmodel"]

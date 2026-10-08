@@ -1,18 +1,29 @@
-package metric_test
+package timeseries_test
 
 import (
 	"testing"
 	"time"
 
-	"github.com/Hayao0819/hytop/internal/domain/metric"
+	"github.com/Hayao0819/hytop/pkg/termui/timeseries"
 )
 
 var origin = time.Date(2026, 8, 29, 12, 0, 0, 0, time.UTC)
 
+func newSeries(t *testing.T, resolutions []timeseries.Resolution) *timeseries.Series {
+	t.Helper()
+
+	history, err := timeseries.NewSeries(resolutions)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return history
+}
+
 func TestRingDropsTheOldestWhenFull(t *testing.T) {
 	t.Parallel()
 
-	s := metric.NewSeries([]metric.Resolution{{Interval: time.Second, Retention: 2 * time.Second}})
+	s := newSeries(t, []timeseries.Resolution{{Interval: time.Second, Retention: 2 * time.Second}})
 
 	for i := range 10 {
 		s.Push(origin.Add(time.Duration(i)*time.Second), float64(i))
@@ -36,7 +47,7 @@ func TestRingDropsTheOldestWhenFull(t *testing.T) {
 func TestRingKeepsItsLengthAtTheFirstWrap(t *testing.T) {
 	t.Parallel()
 
-	s := metric.NewSeries([]metric.Resolution{{Interval: time.Second, Retention: 2 * time.Second}})
+	s := newSeries(t, []timeseries.Resolution{{Interval: time.Second, Retention: 2 * time.Second}})
 	for i := range 4 {
 		s.Push(origin.Add(time.Duration(i)*time.Second), float64(i))
 	}
@@ -50,7 +61,7 @@ func TestRingKeepsItsLengthAtTheFirstWrap(t *testing.T) {
 func TestCoarseTiersAverageTheFineOnes(t *testing.T) {
 	t.Parallel()
 
-	s := metric.NewSeries([]metric.Resolution{
+	s := newSeries(t, []timeseries.Resolution{
 		{Interval: time.Second, Retention: time.Minute},
 		{Interval: 10 * time.Second, Retention: time.Hour},
 	})
@@ -78,7 +89,7 @@ func TestCoarseTiersAverageTheFineOnes(t *testing.T) {
 func TestWindowShowsTheOpenBucket(t *testing.T) {
 	t.Parallel()
 
-	s := metric.NewSeries([]metric.Resolution{
+	s := newSeries(t, []timeseries.Resolution{
 		{Interval: time.Second, Retention: time.Minute},
 		{Interval: 10 * time.Second, Retention: time.Hour},
 	})
@@ -96,7 +107,7 @@ func TestWindowShowsTheOpenBucket(t *testing.T) {
 func TestWindowPicksTheFinestTierThatReachesBack(t *testing.T) {
 	t.Parallel()
 
-	s := metric.NewSeries([]metric.Resolution{
+	s := newSeries(t, []timeseries.Resolution{
 		{Interval: time.Second, Retention: 10 * time.Second},
 		{Interval: 10 * time.Second, Retention: time.Hour},
 	})
@@ -121,7 +132,7 @@ func TestWindowPicksTheFinestTierThatReachesBack(t *testing.T) {
 func TestWindowExcludesWhatFellOutOfIt(t *testing.T) {
 	t.Parallel()
 
-	s := metric.NewSeries([]metric.Resolution{{Interval: time.Second, Retention: time.Hour}})
+	s := newSeries(t, []timeseries.Resolution{{Interval: time.Second, Retention: time.Hour}})
 
 	for i := range 60 {
 		s.Push(origin.Add(time.Duration(i)*time.Second), float64(i))
@@ -136,7 +147,7 @@ func TestWindowExcludesWhatFellOutOfIt(t *testing.T) {
 func TestEmptySeries(t *testing.T) {
 	t.Parallel()
 
-	s := metric.NewSeries(nil)
+	s := newSeries(t, []timeseries.Resolution{{Interval: time.Second, Retention: time.Minute}})
 
 	if _, ok := s.Last(); ok {
 		t.Error("Last on an empty series reported a point")
@@ -144,5 +155,30 @@ func TestEmptySeries(t *testing.T) {
 
 	if got := s.Window(origin, time.Minute); len(got) != 0 {
 		t.Errorf("Window on an empty series = %v", got)
+	}
+}
+
+func TestWindowBeyondCompactTimestampBounds(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name string
+		at   time.Time
+		now  time.Time
+		span time.Duration
+		want int
+	}{
+		{"before minimum", time.Unix(0, -1<<63), time.Unix(0, -1<<63), time.Second, 1},
+		{"after maximum", time.Unix(0, 1<<63-1), time.Unix(0, 1<<63-1).Add(2 * time.Second), time.Second, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			s := newSeries(t, []timeseries.Resolution{{Interval: time.Second, Retention: time.Minute}})
+			s.Push(tc.at, 42)
+			if points := s.Window(tc.now, tc.span); len(points) != tc.want {
+				t.Fatalf("Window at %s = %v, want %d points", tc.now, points, tc.want)
+			}
+		})
 	}
 }
