@@ -110,6 +110,24 @@ func TestStructuralRelations(t *testing.T) {
 	}
 }
 
+func TestSiblingsDoNotGroupUnrelatedOrphans(t *testing.T) {
+	t.Parallel()
+
+	snapshot := procmodel.NewSnapshot([]procmodel.Process{
+		{PID: 1, PPID: 0},
+		{PID: 11, PPID: 999},
+		{PID: 12, PPID: 999},
+		{PID: 13, PPID: 777},
+	})
+	expr, err := filter.Compile("siblings(pid == 11)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := filter.Select(expr, snapshot); err != nil || !slices.Equal(got, []int{12}) {
+		t.Fatalf("siblings(pid == 11) = %v, %v; want [12]", got, err)
+	}
+}
+
 func TestVariables(t *testing.T) {
 	t.Parallel()
 

@@ -226,7 +226,7 @@ func (s *Snapshot) Siblings(pid int) []int {
 	found := make([]int, 0, len(among))
 
 	for _, sibling := range among {
-		if sibling != pid {
+		if sibling != pid && s.byPID[sibling].PPID == p.PPID {
 			found = append(found, sibling)
 		}
 	}

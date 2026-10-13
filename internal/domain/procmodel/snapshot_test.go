@@ -79,6 +79,23 @@ func TestSiblings(t *testing.T) {
 	}
 }
 
+func TestSiblingsKeepTheirRealParentWhenItIsMissing(t *testing.T) {
+	t.Parallel()
+
+	s := procmodel.NewSnapshot([]procmodel.Process{
+		{PID: 1, PPID: 0},
+		{PID: 11, PPID: 999},
+		{PID: 12, PPID: 999},
+		{PID: 13, PPID: 777},
+	})
+	if got := s.Siblings(11); !slices.Equal(got, []int{12}) {
+		t.Fatalf("Siblings(11) = %v, want [12]", got)
+	}
+	if got := s.Siblings(13); len(got) != 0 {
+		t.Fatalf("Siblings(13) = %v, want none", got)
+	}
+}
+
 func TestAProcessWhoseParentIsGoneBecomesARoot(t *testing.T) {
 	t.Parallel()
 
@@ -92,7 +109,7 @@ func TestAProcessWhoseParentIsGoneBecomesARoot(t *testing.T) {
 		t.Errorf("Len = %d, want every process kept", s.Len())
 	}
 
-	if got := s.Siblings(99); !slices.Equal(got, []int{1}) {
+	if got := s.Siblings(99); len(got) != 0 {
 		t.Errorf("Siblings(99) = %v", got)
 	}
 }
