@@ -5,7 +5,6 @@ package diskusage
 
 import (
 	"context"
-	"os"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -162,57 +161,6 @@ func (s *Scanner) fail(err error, walk uint64) {
 // Remove deletes a descendant of the scan root after validating mount boundaries.
 func (s *Scanner) Remove(path string) error {
 	return RemoveInside(s.Scan().Root, path, s.mounts)
-}
-
-// RemoveInside removes path only when it is below root and crosses no mount.
-func RemoveInside(root, path string, mounts MountSource) error {
-	if mounts == nil {
-		mounts = noMounts
-	}
-
-	rootAbs, err := canonical(root)
-	if err != nil {
-		return errors.Wrapf(err, "resolving %s", root)
-	}
-	pathAbs, err := canonical(path)
-	if err != nil {
-		return errors.Wrapf(err, "resolving %s", path)
-	}
-	rel, err := filepath.Rel(rootAbs, pathAbs)
-	if err != nil || rel == "." || rel == ".." || filepath.IsAbs(rel) ||
-		(len(rel) > 2 && rel[:3] == "../") {
-		return errors.Newf("%s is not inside %s", pathAbs, rootAbs)
-	}
-
-	// os.RemoveAll can empty a nested mount before failing at its mount point.
-	all, err := mounts()
-	if err != nil {
-		return errors.Wrap(err, "reading mount boundaries")
-	}
-
-	held := ""
-	for _, mount := range all {
-		mountPath, err := absolute(mount.Path)
-		if err == nil && (mountPath == pathAbs || within(pathAbs, mountPath)) {
-			held = mountPath
-			break
-		}
-	}
-	if held != "" {
-		return errors.Newf("%s holds another filesystem, mounted at %s: unmount it first", path, held)
-	}
-
-	rooted, err := os.OpenRoot(rootAbs)
-	if err != nil {
-		return errors.Wrapf(err, "opening %s", rootAbs)
-	}
-	defer func() { _ = rooted.Close() }()
-
-	if err := rooted.RemoveAll(rel); err != nil {
-		return errors.Wrapf(err, "removing %s", pathAbs)
-	}
-
-	return nil
 }
 
 func (s *Scanner) RemoveElevated(ctx context.Context, path, password string) error {

@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -115,43 +114,6 @@ func (s *Scanner) RestartElevated(ctx context.Context, root, password string) er
 		s.running.Store(false)
 	}
 	return nil
-}
-
-func RemoveInside(root, path string, mounts MountSource) error {
-	if mounts == nil {
-		mounts = noMounts
-	}
-	rootAbs, err := canonical(root)
-	if err != nil {
-		return err
-	}
-	pathAbs, err := canonical(path)
-	if err != nil {
-		return err
-	}
-	rel, err := filepath.Rel(rootAbs, pathAbs)
-	if err != nil {
-		return err
-	}
-	if rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
-		return os.ErrPermission
-	}
-	all, err := mounts()
-	if err != nil {
-		return err
-	}
-	for _, mount := range all {
-		mountAbs, _ := absolute(mount.Path)
-		if mountAbs == pathAbs || strings.HasPrefix(mountAbs, pathAbs+string(os.PathSeparator)) {
-			return os.ErrPermission
-		}
-	}
-	rooted, err := os.OpenRoot(rootAbs)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = rooted.Close() }()
-	return rooted.RemoveAll(rel)
 }
 
 func Measure(ctx context.Context, root string, mounts MountSource) (diskmodel.Scan, error) {
