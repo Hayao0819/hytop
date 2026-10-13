@@ -339,6 +339,22 @@ func TestPermissionDeniedDeleteCanAuthenticateAndRefresh(t *testing.T) {
 	}
 }
 
+func TestAuthenticationAcceptsQAsPasswordText(t *testing.T) {
+	t.Parallel()
+
+	scanner := &stubScanner{fail: os.ErrPermission}
+	program := storage(t, scanner)
+	press(t, program, "]", "]", "l", "D", "enter", "s", "q", "u", "i", "r", "r", "e", "l")
+	if got := plain(program); !strings.Contains(got, "Administrator authentication") ||
+		!strings.Contains(got, "••••••••") || strings.Contains(got, "squirrel") {
+		t.Fatalf("password input closed or was not masked:\n%s", got)
+	}
+	press(t, program, "enter")
+	if scanner.password != "squirrel" || len(scanner.removed) != 1 || scanner.restarts != 1 {
+		t.Fatalf("authenticated delete: password=%q removed=%v restarts=%d", scanner.password, scanner.removed, scanner.restarts)
+	}
+}
+
 func TestPermissionDeniedScanOffersAndUsesElevation(t *testing.T) {
 	t.Parallel()
 

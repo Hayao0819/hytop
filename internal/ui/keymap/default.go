@@ -119,7 +119,7 @@ func Default() *Map {
 		bind(DeleteConfirm, Apply, "delete permanently", "enter").as("delete"),
 		bind(DeleteConfirm, Cancel, "cancel", "esc", "q"),
 		bind(Auth, Apply, "authenticate", "enter").as("continue"),
-		bind(Auth, Cancel, "cancel", "esc", "q"),
+		bind(Auth, Cancel, "cancel", "esc"),
 
 		bind(HelpScreen, Down, "scroll down", "j", "down").as("scroll"),
 		bind(HelpScreen, Up, "scroll up", "k", "up").as("scroll"),
