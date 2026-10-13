@@ -67,6 +67,29 @@ func TestUnchangedFactsDoNotAdvanceTheGeneration(t *testing.T) {
 	}
 }
 
+func TestAnEmptyFactSourceIsStillKnown(t *testing.T) {
+	t.Parallel()
+
+	memory := store.New(nil)
+	if memory.HasFactSource("hwmon") {
+		t.Fatal("a source that has never published facts is known")
+	}
+	memory.ReplaceFacts("hwmon", nil)
+	if !memory.HasFactSource("hwmon") {
+		t.Fatal("an empty published fact set is indistinguishable from an unknown source")
+	}
+	generation := memory.Generation()
+	memory.ReplaceFacts("hwmon", nil)
+	if memory.Generation() != generation {
+		t.Fatal("an unchanged empty fact set advanced generation")
+	}
+	memory.ReplaceFacts("hwmon", map[string]string{"power.sensor.watts.source": "sensor"})
+	memory.ReplaceFacts("hwmon", nil)
+	if !memory.HasFactSource("hwmon") {
+		t.Fatal("removing the last fact forgot that the source was observed")
+	}
+}
+
 func TestHistoryPoliciesOnlyExtendMatchingSeries(t *testing.T) {
 	t.Parallel()
 

@@ -83,6 +83,50 @@ func TestDesktopPowerPageShowsAvailableSensorsSeparately(t *testing.T) {
 	}
 }
 
+func TestRemovingAGPURemovesItsCurrentPowerButKeepsHistory(t *testing.T) {
+	memory := store.New(metric.DefaultResolutions())
+	memory.WriteSamples([]metric.Sample{
+		{Key: "cpu.package.power", Value: 35, Time: time.Now()},
+		{Key: "gpu.0.power", Value: 30, Time: time.Now()},
+		{Key: "power.amdgpu_power1.watts", Value: 30, Time: time.Now()},
+	})
+	memory.ReplaceFacts("gpu", map[string]string{
+		"gpu.name.0": "External GPU", "gpu.0.power.source": "gpu0/power1",
+	})
+	memory.ReplaceFacts("hwmon", map[string]string{
+		"power.amdgpu_power1.watts.source": "gpu0/power1",
+	})
+	cards := []int{0}
+	program := graphProgram(memory, func() []int { return cards }, nil, "/graphs/power")
+	if got := testkit.Plain(program); !strings.Contains(got, "External GPU") {
+		t.Fatalf("GPU power did not open:\n%s", got)
+	}
+	cards = nil
+	memory.ReplaceFacts("gpu", nil)
+	memory.ReplaceFacts("hwmon", nil)
+	program.Send(struct{}{})
+	got := testkit.Plain(program)
+	if program.Route() != "/graphs/power" || !strings.Contains(got, "CPU package") ||
+		strings.Contains(got, "GPU") || strings.Contains(got, "amdgpu") || strings.Contains(got, "30.0 W") {
+		t.Fatalf("removed GPU or its hwmon alias remained current:\n%s", got)
+	}
+	if points := memory.Window("gpu.0.power", time.Minute); len(points) != 1 {
+		t.Fatalf("removed GPU lost its historical readings: %v", points)
+	}
+}
+
+func TestRemovingTheLastPowerSensorReturnsToAnAvailablePage(t *testing.T) {
+	memory := store.New(metric.DefaultResolutions())
+	memory.WriteSamples([]metric.Sample{{Key: "power.psu_power1.watts", Value: 120, Time: time.Now()}})
+	memory.ReplaceFacts("hwmon", map[string]string{"power.psu_power1.watts.source": "psu/power1"})
+	program := graphProgram(memory, nil, nil, "/graphs/power")
+	memory.ReplaceFacts("hwmon", nil)
+	program.Send(struct{}{})
+	if program.Route() != "/graphs/cpu" {
+		t.Fatalf("route after removing last power sensor = %q, want /graphs/cpu", program.Route())
+	}
+}
+
 func TestPowerPageRemovesAHwmonAliasWhenItsSourceIsIdentified(t *testing.T) {
 	memory := store.New(metric.DefaultResolutions())
 	now := time.Now()

@@ -2,12 +2,13 @@ package page
 
 import (
 	"fmt"
+	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/Hayao0819/reactea/v2"
 
 	"github.com/Hayao0819/hytop/internal/domain/series"
-	"github.com/Hayao0819/hytop/internal/store"
 	"github.com/Hayao0819/hytop/internal/ui/theme"
 	"github.com/Hayao0819/hytop/internal/ui/widget/graph"
 	"github.com/Hayao0819/hytop/internal/ui/widget/statgrid"
@@ -18,14 +19,19 @@ var powerColours = []theme.Token{
 	theme.CPU, theme.Battery, theme.DiskRead, theme.NetTx, theme.Memory, theme.Critical,
 }
 
-func powerSeries(s *store.Store) []series.Key {
+func powerSeries(env Env) []series.Key {
+	s := env.Store
 	keys := s.Keys()
+	var cards []int
+	if env.GPUs != nil {
+		cards = env.GPUs()
+	}
 	patterns := []series.Pattern{"cpu.package.power", "gpu.*.power", "power.*.watts"}
 	found := make([]series.Key, 0, len(keys))
 	sources := map[string]bool{}
 	for _, pattern := range patterns {
 		for _, key := range keys {
-			if !pattern.Match(key) {
+			if !pattern.Match(key) || !powerAvailable(env, cards, key) {
 				continue
 			}
 			source, _ := s.Fact(string(key) + ".source")
@@ -40,6 +46,24 @@ func powerSeries(s *store.Store) []series.Key {
 	}
 
 	return found
+}
+
+func powerAvailable(env Env, cards []int, key series.Key) bool {
+	segments := key.Segments()
+	switch segments[0] {
+	case "gpu":
+		id, err := strconv.Atoi(segments[1])
+		if err != nil || env.GPUs != nil && !slices.Contains(cards, id) {
+			return false
+		}
+		_, named := env.Store.Fact("gpu.name." + segments[1])
+		return !env.Store.HasFactSource("gpu") || named
+	case "power":
+		_, known := env.Store.Fact(string(key) + ".source")
+		return !env.Store.HasFactSource("hwmon") || known
+	default:
+		return true
+	}
 }
 
 func Power(env Env, keys []series.Key) reactea.Component {

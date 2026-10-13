@@ -62,7 +62,7 @@ func (g *Graphs) refresh() bool {
 	if g.env.Batteries != nil {
 		batteryIndices = g.env.Batteries()
 	}
-	if keys := powerSeries(g.env.Store); len(batteryIndices) == 0 && len(keys) > 0 {
+	if keys := powerSeries(g.env); len(batteryIndices) == 0 && len(keys) > 0 {
 		specs = append(specs, GraphSpec{
 			Title: "Power", Route: "/graphs/power", Key: keys[0],
 			Unit: series.Watts, Token: theme.CPU, Sources: keys,

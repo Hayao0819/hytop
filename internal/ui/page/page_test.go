@@ -79,7 +79,7 @@ func TestPowerSeriesDeduplicatesOnlyKnownSensorAliases(t *testing.T) {
 				"gpu.0.power.source":               "/sys/devices/gpu0/hwmon/power1",
 				"power.amdgpu_power1.watts.source": tc.source,
 			})
-			if got := powerSeries(memory); !slices.Equal(got, tc.want) {
+			if got := powerSeries(Env{Store: memory}); !slices.Equal(got, tc.want) {
 				t.Fatalf("power series = %v, want %v", got, tc.want)
 			}
 		})

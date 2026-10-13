@@ -160,9 +160,6 @@ func (s *Store) WriteFacts(facts map[string]string) {
 		if owner, ok := s.factOwners[key]; ok {
 			delete(s.factOwners, key)
 			delete(s.sourceFacts[owner], key)
-			if len(s.sourceFacts[owner]) == 0 {
-				delete(s.sourceFacts, owner)
-			}
 		}
 	}
 
@@ -175,12 +172,12 @@ func (s *Store) ReplaceFacts(source string, facts map[string]string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	owned := s.sourceFacts[source]
-	if owned == nil && len(facts) > 0 {
+	owned, known := s.sourceFacts[source]
+	if !known {
 		owned = make(map[string]struct{}, len(facts))
 		s.sourceFacts[source] = owned
 	}
-	changed := false
+	changed := !known
 
 	for key := range owned {
 		if _, ok := facts[key]; ok {
@@ -203,21 +200,23 @@ func (s *Store) ReplaceFacts(source string, facts map[string]string) {
 
 		if previous := s.factOwners[key]; previous != "" && previous != source {
 			delete(s.sourceFacts[previous], key)
-			if len(s.sourceFacts[previous]) == 0 {
-				delete(s.sourceFacts, previous)
-			}
 		}
 		s.factOwners[key] = source
 		owned[key] = struct{}{}
 	}
 
-	if len(owned) == 0 {
-		delete(s.sourceFacts, source)
-	}
-
 	if changed {
 		s.generation++
 	}
+}
+
+// HasFactSource distinguishes a published empty fact set from an unknown source.
+func (s *Store) HasFactSource(source string) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	_, ok := s.sourceFacts[source]
+	return ok
 }
 
 // Fact is a text reading that barely changes, such as a CPU model.
