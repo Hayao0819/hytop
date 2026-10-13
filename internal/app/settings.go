@@ -1,6 +1,7 @@
 package app
 
 import (
+	"slices"
 	"time"
 
 	"github.com/Hayao0819/hytop/internal/conf"
@@ -26,6 +27,15 @@ type preference struct {
 	Options []string
 	Value   func(conf.Config) string
 	Apply   func(*conf.Config, string)
+}
+
+func (p preference) withCurrent(c conf.Config) preference {
+	value := p.Value(c)
+	if !slices.Contains(p.Options, value) {
+		p.Options = append(slices.Clone(p.Options), value)
+	}
+
+	return p
 }
 
 func preferences() []preference {
@@ -103,8 +113,10 @@ func (r *Root) settingItems() []*page.Setting {
 		}
 	}
 
-	items := make([]*page.Setting, 0, len(preferences()))
-	for _, spec := range preferences() {
+	specs := preferences()
+	items := make([]*page.Setting, 0, len(specs))
+	for _, spec := range specs {
+		spec = spec.withCurrent(r.config)
 		items = append(items, &page.Setting{
 			Group: spec.Group, Label: spec.Label, What: spec.What,
 			Options: spec.Options, Chosen: index(spec.Options, spec.Value(r.config)),

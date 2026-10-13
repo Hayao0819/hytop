@@ -108,7 +108,7 @@ func (s *setup) change(by int) {
 func (s *setup) item() (preference, bool) {
 	for _, item := range preferences() {
 		if item.Step == s.step {
-			return item, true
+			return item.withCurrent(s.config), true
 		}
 	}
 
