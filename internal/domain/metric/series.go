@@ -40,7 +40,7 @@ func NewSeries(resolutions []Resolution) *Series {
 		resolutions = DefaultResolutions()
 	}
 
-	history, err := timeseries.NewSeries(resolutions)
+	history, err := timeseries.NewBucketedSeries(resolutions)
 	if err != nil {
 		panic(err)
 	}

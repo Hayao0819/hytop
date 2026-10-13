@@ -52,3 +52,31 @@ func TestNewSeriesKeepsHytopDefaults(t *testing.T) {
 		}
 	}
 }
+
+func TestSubsecondCollectionRetainsTheConfiguredHistory(t *testing.T) {
+	t.Parallel()
+
+	for _, period := range []time.Duration{100 * time.Millisecond, 250 * time.Millisecond, 500 * time.Millisecond, time.Second, 2 * time.Second} {
+		t.Run(period.String(), func(t *testing.T) {
+			t.Parallel()
+
+			origin := time.Unix(1800000000, 0)
+			history := metric.NewSeries(metric.ResolutionsFor(24 * time.Hour))
+			for elapsed := time.Duration(0); elapsed <= 800*time.Second; elapsed += period {
+				history.Push(origin.Add(elapsed), float64(elapsed/period))
+			}
+			now := origin.Add(800 * time.Second)
+			points := history.Window(now, 5*time.Minute)
+			if len(points) == 0 || now.Sub(points[0].Time) < 5*time.Minute-period {
+				t.Fatalf("%s collection did not retain 5m: %v", period, points)
+			}
+			if history.Len() > 601 {
+				t.Fatalf("%s collection retained %d points, exceeding the finest tier's budget", period, history.Len())
+			}
+			last, ok := history.Last()
+			if !ok || !last.Time.Equal(now) || last.Value != float64(800*time.Second/period) {
+				t.Fatalf("latest raw reading = %v, %v", last, ok)
+			}
+		})
+	}
+}
