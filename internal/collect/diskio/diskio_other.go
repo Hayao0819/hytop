@@ -51,8 +51,9 @@ func (c *Collector) Collect(ctx context.Context, now time.Time) ([]metric.Sample
 		totalRead += read
 		totalWrite += write
 		samples = append(samples, metric.Sample{Key: series.Key("diskio." + name + ".read"), Value: read, Time: now}, metric.Sample{Key: series.Key("diskio." + name + ".write"), Value: write, Time: now})
-		if stat.IoTime >= previous.io {
-			samples = append(samples, metric.Sample{Key: series.Key("diskio." + name + ".util"), Value: float64(stat.IoTime-previous.io) / (seconds * 10), Time: now})
+		// Some backends leave IoTime unset, which is indistinguishable from zero.
+		if stat.IoTime > 0 && stat.IoTime >= previous.io {
+			samples = append(samples, metric.Sample{Key: series.Key("diskio." + name + ".util"), Value: min(float64(stat.IoTime-previous.io)/(seconds*10), 100), Time: now})
 		}
 	}
 	samples = append(samples, metric.Sample{Key: "diskio.total.read", Value: totalRead, Time: now}, metric.Sample{Key: "diskio.total.write", Value: totalWrite, Time: now})

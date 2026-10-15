@@ -4,6 +4,7 @@ package page
 import (
 	"cmp"
 	"fmt"
+	"image/color"
 	"slices"
 	"strconv"
 
@@ -22,7 +23,7 @@ import (
 // Explicit border sides trigger charmbracelet/lipgloss#732.
 var pane = lipgloss.NewStyle().BorderStyle(lipgloss.RoundedBorder()).Padding(0, 1)
 
-// minGraph reserves two border rows and four plot rows.
+// minGraph reserves two border rows and four content rows.
 const minGraph = 6
 
 type detail struct {
@@ -31,7 +32,7 @@ type detail struct {
 	box    *layout.Box
 	title  string
 	head   layout.Item
-	graph  layout.Item
+	graphs []layout.Item
 	stats  *statgrid.Widget
 	facts  *statgrid.Widget
 	shaped [2]int
@@ -46,8 +47,12 @@ func Detail(env Env, title string, g *graph.Widget, stats *statgrid.Widget) reac
 func DetailWithFacts(
 	env Env, title string, g *graph.Widget, stats, facts *statgrid.Widget,
 ) reactea.Component {
-	g.Span = env.Span
+	return detailWithGraphs(env, title, []*graph.Widget{g}, stats, facts)
+}
 
+func detailWithGraphs(
+	env Env, title string, graphs []*graph.Widget, stats, facts *statgrid.Widget,
+) reactea.Component {
 	d := &detail{title: title, stats: stats, facts: facts}
 
 	d.head = layout.Fixed(1, reactea.Func(func(ctx *reactea.Ctx) string {
@@ -55,12 +60,15 @@ func DetailWithFacts(
 	}))
 
 	active := pane.BorderForeground(env.Theme.Colour(theme.BorderActive))
-	d.graph = layout.Grow(3, layout.Memo(
-		layout.Framed(pane.BorderForeground(env.Theme.Colour(theme.Border)), g).WhenFocused(active),
-		func() any { return env.Store.Generation() },
-	)).Bounds(minGraph, 0).Focusable()
+	for _, g := range graphs {
+		g.Span = env.Span
+		d.graphs = append(d.graphs, layout.Grow(3, layout.Memo(
+			layout.Framed(pane.BorderForeground(env.Theme.Colour(theme.Border)), g).WhenFocused(active),
+			func() any { return env.Store.Generation() },
+		)).Bounds(minGraph, 0).Focusable())
+	}
 
-	d.box = layout.Column(d.head, d.graph)
+	d.box = layout.Column(append([]layout.Item{d.head}, d.graphs...)...)
 	d.reshape()
 
 	d.Wrapper = reactea.Wrap(d.box)
@@ -87,7 +95,7 @@ func (d *detail) reshape(width ...int) {
 
 	d.shaped = rows
 
-	items := []layout.Item{d.head, d.graph}
+	items := append([]layout.Item{d.head}, d.graphs...)
 	if rows[0] > 0 {
 		items = append(items, layout.Grow(1, d.stats).Bounds(min(2, rows[0]), rows[0]))
 	}
@@ -156,6 +164,25 @@ func Disk(env Env) reactea.Component {
 	g.Fill = false
 	g.Label = "read and write"
 
+	utilisation := graph.New(env.Store, env.Caps, graph.Track{
+		Pattern: "diskio.*.util",
+		Palette: []color.Color{
+			env.Theme.Colour(theme.DiskRead), env.Theme.Colour(theme.DiskWrite),
+			env.Theme.Colour(theme.NetRx), env.Theme.Colour(theme.NetTx),
+		},
+	})
+	utilisation.Range = chart.Range{Max: 100}
+	utilisation.Fill = false
+	utilisation.Label = "% active time"
+	utilisation.Legend = func(key series.Key) string {
+		name := key.Segments()[1]
+		if point, ok := env.Store.Last(key); ok {
+			return name + " " + series.Percent.Format(point.Value, 1, series.Auto)
+		}
+
+		return name
+	}
+
 	stats := statgrid.New(env.Store,
 		statgrid.Stat{Label: "Read", Key: "diskio.total.read", Unit: series.BytesPerSecond, Precision: 1, Big: true},
 		statgrid.Stat{Label: "Write", Key: "diskio.total.write", Unit: series.BytesPerSecond, Precision: 1, Big: true},
@@ -163,7 +190,7 @@ func Disk(env Env) reactea.Component {
 		statgrid.Stat{Label: "IO pressure 60s", Key: "psi.io.some.avg60", Unit: series.Percent, Precision: 2},
 	)
 
-	return Detail(env, "Disk", g, stats)
+	return detailWithGraphs(env, "Disk", []*graph.Widget{g, utilisation}, stats, nil)
 }
 
 // byCoreNumber sorts cpu.core.10 after cpu.core.9, which sorting the keys as
