@@ -40,6 +40,10 @@ type Env struct {
 	Registry  *series.Registry
 	Scheduler *collect.Scheduler
 
+	// Initialize discovers and primes collectors off the UI goroutine, before
+	// Scheduler.Run starts. It must honor cancellation when the UI closes.
+	Initialize func(context.Context) (Sources, error)
+
 	Caps   render.Caps
 	Config conf.Config
 	Live   Live
@@ -88,6 +92,10 @@ type Root struct {
 	home map[string]string
 
 	stop func()
+
+	sources  Sources
+	starting bool
+	startErr error
 }
 
 var chrome = lipgloss.NewStyle().Padding(1, 1, 0, 0)
@@ -96,21 +104,21 @@ var chrome = lipgloss.NewStyle().Padding(1, 1, 0, 0)
 type Refresh time.Time
 
 func New(env Env) *Root {
-	if env.Interfaces == nil {
-		env.Interfaces = func() []string { return nil }
+	root := &Root{
+		env: env, config: env.Config, home: map[string]string{},
+		starting: env.Initialize != nil,
+		sources: Sources{
+			Interfaces: env.Interfaces, GPUs: env.GPUs, Batteries: env.Batteries,
+			Units: env.Units, Mounts: env.Mounts,
+		},
 	}
-
-	if env.Units == nil {
-		env.Units = func() []unitmodel.Unit { return nil }
-	}
-	if env.GPUs == nil {
-		env.GPUs = func() []int { return nil }
-	}
-	if env.Batteries == nil {
-		env.Batteries = func() []int { return nil }
-	}
-
-	root := &Root{env: env, config: env.Config, home: map[string]string{}}
+	// Method values retain this UI-owned slot when initialization replaces its
+	// readers, so existing pages and in-progress input do not need remounting.
+	root.env.Interfaces = root.sources.interfaces
+	root.env.GPUs = root.sources.gpus
+	root.env.Batteries = root.sources.batteries
+	root.env.Units = root.sources.units
+	root.env.Mounts = root.sources.mounts
 
 	if env.Live != nil {
 		root.config, root.generation = env.Live.Config(), env.Live.Generation()
@@ -150,6 +158,7 @@ func (r *Root) build() {
 		Interfaces: r.env.Interfaces,
 		GPUs:       r.env.GPUs,
 		Batteries:  r.env.Batteries,
+		Starting:   func() bool { return r.starting },
 	}
 
 	r.graphs = page.NewGraphs(pageEnv)
@@ -297,6 +306,7 @@ func (r *Root) Init(ctx *reactea.Ctx) tea.Cmd {
 
 	commands := []tea.Cmd{
 		r.Wrapper.Init(ctx),
+		r.initialize(ctx.Context()),
 		reactea.SetMouseMode(tea.MouseModeCellMotion),
 		tick(r.interval()),
 	}
@@ -324,6 +334,18 @@ func (r *Root) Update(ctx *reactea.Ctx, msg tea.Msg) tea.Cmd {
 }
 
 func (r *Root) update(ctx *reactea.Ctx, msg tea.Msg) tea.Cmd {
+	if initialized, ok := msg.(initializedMsg); ok {
+		if ctx.Context().Err() != nil {
+			return nil
+		}
+		r.starting = false
+		if initialized.err != nil {
+			r.startErr = errors.Wrap(initialized.err, "initializing collectors")
+			return tea.Quit
+		}
+		r.sources = initialized.sources
+		return r.Wrapper.Update(ctx, msg)
+	}
 	if background, ok := msg.(tea.BackgroundColorMsg); ok && r.config.Appearance.Background == conf.Auto {
 		dark := background.IsDark()
 		if r.dark == nil || *r.dark != dark {
@@ -437,15 +459,13 @@ func (r *Root) stepMode(ctx *reactea.Ctx, by int) tea.Cmd {
 	return r.enter(ctx, (current+by+len(r.modes))%len(r.modes))
 }
 
-// Run wires the scheduler to the program and blocks until the user quits.
+// Run initializes collection alongside rendering and blocks until the user quits.
 func Run(ctx context.Context, env Env) error {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	return run(ctx, env)
+}
 
+func run(ctx context.Context, env Env, options ...tea.ProgramOption) error {
 	root := New(env)
-	root.OnQuit(cancel)
-
-	go env.Scheduler.Run(ctx)
 
 	// Seed the route before Bubble Tea draws its initial frame.
 	program := reactea.New(modal.New(root),
@@ -453,10 +473,12 @@ func Run(ctx context.Context, env Env) error {
 		reactea.WithAltScreen(),
 		reactea.WithWindowTitle("hytop"),
 	)
+	defer program.Scope().Close()
 
-	if err := program.Run(); err != nil {
+	options = append(options, tea.WithContext(ctx))
+	if err := program.Run(options...); err != nil {
 		return errors.Wrap(err, "running the terminal program")
 	}
 
-	return nil
+	return root.startErr
 }

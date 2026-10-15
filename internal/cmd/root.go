@@ -20,20 +20,11 @@ import (
 	"github.com/Hayao0819/hytop/internal/conf"
 	"github.com/Hayao0819/hytop/internal/domain/diskmodel"
 	"github.com/Hayao0819/hytop/internal/domain/metric"
-	"github.com/Hayao0819/hytop/internal/domain/unitmodel"
 	"github.com/Hayao0819/hytop/internal/errors"
 	"github.com/Hayao0819/hytop/internal/store"
 	"github.com/Hayao0819/hytop/internal/ui/page"
 	"github.com/Hayao0819/hytop/internal/ui/render"
 )
-
-type devices struct {
-	interfaces func() []string
-	gpus       func() []int
-	batteries  func() []int
-	units      func() []unitmodel.Unit
-	mounts     func() []diskmodel.Mount
-}
 
 type options struct {
 	procRoot string
@@ -135,7 +126,7 @@ func run(cmd *cobra.Command, opts options) error {
 
 	running.Store(&settings)
 
-	registry, found, err := register(scheduler, func() conf.Config { return *running.Load() }, opts)
+	registry, err := seriesRegistry()
 	if err != nil {
 		return err
 	}
@@ -162,11 +153,6 @@ func run(cmd *cobra.Command, opts options) error {
 			}
 		}
 	}()
-
-	// Bound initial collection so a stalled source cannot block startup.
-	primed, done := context.WithTimeout(ctx, 5*time.Second)
-	scheduler.Prime(primed, 2, min(time.Duration(settings.General.Interval), 700*time.Millisecond))
-	done()
 
 	savePath := opts.config
 	if savePath == "" {
@@ -201,19 +187,26 @@ func run(cmd *cobra.Command, opts options) error {
 	}
 
 	return app.Run(ctx, app.Env{
-		Store:         memory,
-		View:          state,
-		Registry:      registry,
-		Scheduler:     scheduler,
-		Caps:          detected,
-		Config:        settings,
-		Live:          watcher,
-		Interfaces:    found.interfaces,
-		GPUs:          found.gpus,
-		Batteries:     found.batteries,
-		Units:         found.units,
+		Store:     memory,
+		View:      state,
+		Registry:  registry,
+		Scheduler: scheduler,
+		Caps:      detected,
+		Config:    settings,
+		Live:      watcher,
+		Initialize: func(ctx context.Context) (app.Sources, error) {
+			found, err := register(ctx, scheduler, func() conf.Config { return *running.Load() }, opts)
+			if err != nil {
+				return app.Sources{}, err
+			}
+			// Rate collectors still get two initial readings, while the UI can
+			// render the first results and respond to input throughout the wait.
+			primed, done := context.WithTimeout(ctx, 5*time.Second)
+			defer done()
+			scheduler.Prime(primed, 2, min(time.Duration(running.Load().General.Interval), 700*time.Millisecond))
+			return found, ctx.Err()
+		},
 		FollowLog:     func() page.LogFollower { return journal.NewReader(running.Load().Logs.Lines) },
-		Mounts:        found.mounts,
 		Drives:        drives.Devices,
 		RefreshDrives: refreshDrives,
 		Scanner: func() page.Scanner {

@@ -32,6 +32,8 @@ type Env struct {
 	GPUs func() []int
 	// Batteries includes power-supply batteries even when optional readings are absent.
 	Batteries func() []int
+	// Starting keeps the requested graph reachable while its first readings arrive.
+	Starting func() bool
 }
 
 // Hint is one key-line entry.

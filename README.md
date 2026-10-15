@@ -59,6 +59,10 @@ All collectors are available on Linux, including systemd, containers, SMART,
 and pressure metrics. macOS and Windows provide CPU, memory, disk, network, and
 process views, plus battery information when available.
 
+The interface opens while device discovery and initial readings run in the
+background. A `starting…` status marks initialization; readings appear as they
+arrive, and navigation and quitting remain available throughout.
+
 ## Keys
 
 | | |

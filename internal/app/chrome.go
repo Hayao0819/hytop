@@ -218,6 +218,9 @@ func (r *Root) rightSideFor(width int) string {
 	if src, _ := r.env.View.Filter(); src != "" {
 		parts = append(parts, "filter:"+safe.Text(src))
 	}
+	if r.starting {
+		parts = append(parts, "starting…")
+	}
 
 	if count, name := actionableProblems(r.env.Scheduler.Problems()); count > 0 {
 		if count == 1 {

@@ -27,6 +27,7 @@ type Graphs struct {
 
 	// generation tracks when dynamic device discovery must run again.
 	generation uint64
+	starting   bool
 }
 
 func NewGraphs(env Env) *Graphs {
@@ -49,7 +50,11 @@ func NewGraphs(env Env) *Graphs {
 }
 
 func (g *Graphs) refresh() bool {
+	g.starting = g.env.Starting != nil && g.env.Starting()
 	specs := Available(GraphSpecs(), func(key series.Key) bool {
+		if g.starting && key == "cpu.total.usage" {
+			return true
+		}
 		_, ok := g.env.Store.Last(key)
 
 		return ok
@@ -153,10 +158,12 @@ func (g *Graphs) Hints() []Hint {
 }
 
 func (g *Graphs) Update(ctx *reactea.Ctx, msg tea.Msg) tea.Cmd {
-	if generation := g.env.Store.Generation(); generation != g.generation {
+	starting := g.env.Starting != nil && g.env.Starting()
+	if generation := g.env.Store.Generation(); generation != g.generation || starting != g.starting {
 		g.generation = generation
-
-		if g.refresh() && !g.hasRoute(ctx.Route()) {
+		finished := g.starting && !starting
+		changed := g.refresh()
+		if (changed || finished) && !g.starting && !g.hasRoute(ctx.Route()) {
 			return tea.Batch(ctx.SetRoute(g.specs[0].Route), g.Wrapper.Update(ctx, msg))
 		}
 	}
