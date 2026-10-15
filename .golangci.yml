@@ -39,6 +39,7 @@ linters:
             - github.com/prometheus/procfs
             - github.com/shirou/gopsutil/v4
             - github.com/spf13/cobra
+            - github.com/yusufpapurcu/wmi
             - golang.org/x/sys
           deny:
             - pkg: testing$
