@@ -4,11 +4,13 @@ package graph
 import (
 	"image/color"
 	"math"
+	"strings"
 	"time"
 
 	"charm.land/lipgloss/v2"
 	"github.com/Hayao0819/reactea/v2"
 
+	"github.com/Hayao0819/hytop/internal/domain/safe"
 	"github.com/Hayao0819/hytop/internal/domain/series"
 	"github.com/Hayao0819/hytop/internal/store"
 	"github.com/Hayao0819/hytop/internal/ui/render"
@@ -41,6 +43,8 @@ type Widget struct {
 	Precision int
 	Label     string
 	MaxHeight int
+	// Legend labels each resolved series above the plot when set.
+	Legend func(series.Key) string
 
 	extent chart.Range
 }
@@ -76,6 +80,12 @@ func (w *Widget) Render(ctx *reactea.Ctx) string {
 		hasData  bool
 	)
 
+	prefix := ""
+	if w.Legend != nil && len(resolved) > 0 && height > 1 {
+		prefix = w.legend(resolved, width) + "\n"
+		height--
+	}
+
 	for _, track := range resolved {
 		window := w.store.Window(track.Key, w.Span)
 		resampled := widget.Resample(window, now, w.Span, slots)
@@ -90,7 +100,7 @@ func (w *Widget) Render(ctx *reactea.Ctx) string {
 		colours = append(colours, track.Colour)
 	}
 	if !hasData {
-		return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, "no data")
+		return prefix + lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, "no data")
 	}
 
 	line := chart.Line{
@@ -106,7 +116,17 @@ func (w *Widget) Render(ctx *reactea.Ctx) string {
 
 	w.corners(grid, height)
 
-	return w.paint(grid, colours)
+	return prefix + w.paint(grid, colours)
+}
+
+func (w *Widget) legend(tracks []Track, width int) string {
+	labels := make([]string, 0, len(tracks))
+	for _, track := range tracks {
+		label := safe.Text(w.Legend(track.Key))
+		labels = append(labels, render.Foreground(w.caps, track.Colour).Render(label))
+	}
+
+	return render.Ellipsize(strings.Join(labels, "  "), width)
 }
 
 func (w *Widget) resolveTracks() []Track {
