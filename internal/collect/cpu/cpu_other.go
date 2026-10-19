@@ -77,7 +77,14 @@ func (*Collector) Facts(ctx context.Context) (collect.Facts, error) {
 		return nil, err
 	}
 
-	return portableFacts(info, logical, cores)
+	facts, err := portableFacts(info, logical, cores)
+	if err != nil {
+		return nil, err
+	}
+	for key, value := range platformGuestFacts(ctx) {
+		facts[key] = value
+	}
+	return facts, nil
 }
 
 func portableFacts(info []pscpu.InfoStat, logical, cores int) (collect.Facts, error) {

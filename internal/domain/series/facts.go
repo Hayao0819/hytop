@@ -10,6 +10,8 @@ const (
 	FactCPUBaseSpeed      = "cpu.base_speed"
 	FactCPUVirtualisation = "cpu.virtualisation"
 	FactCPUHypervisor     = "cpu.hypervisor"
+	FactCPUEnvironment    = "cpu.environment"
+	FactCPUConfidential   = "cpu.confidential"
 	FactCPUL1d            = "cpu.cache.l1d"
 	FactCPUL1i            = "cpu.cache.l1i"
 	FactCPUL2             = "cpu.cache.l2"

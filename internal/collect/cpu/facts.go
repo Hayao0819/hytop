@@ -17,7 +17,7 @@ import (
 	"github.com/Hayao0819/hytop/internal/errors"
 )
 
-func (c *Collector) Facts(context.Context) (collect.Facts, error) {
+func (c *Collector) Facts(ctx context.Context) (collect.Facts, error) {
 	info, err := c.fs.CPUInfo()
 	if err != nil {
 		return nil, errors.Wrap(err, "reading /proc/cpuinfo")
@@ -39,8 +39,8 @@ func (c *Collector) Facts(context.Context) (collect.Facts, error) {
 
 	facts[series.FactCPUVirtualisation] = virtualisation(info[0].Flags)
 
-	if guest := c.guest(); guest != "" {
-		facts[series.FactCPUHypervisor] = guest
+	for key, value := range c.guestFacts(ctx, info[0].Flags) {
+		facts[key] = value
 	}
 
 	if base, ok := c.baseSpeed(); ok {
@@ -80,27 +80,6 @@ func virtualisation(flags []string) string {
 	}
 
 	return "unavailable"
-}
-
-// guest reports the hypervisor this machine is itself running under, which is a
-// different question from whether it can host one.
-func (c *Collector) guest() string {
-	if guest := sysread.Text(filepath.Join(c.sysRoot, "hypervisor", "type")); guest != "" {
-		return guest
-	}
-
-	name := sysread.Text(filepath.Join(c.sysRoot, "class", "dmi", "id", "product_name"))
-	if name == "" {
-		return ""
-	}
-
-	for _, known := range []string{"KVM", "VMware", "VirtualBox", "QEMU", "Hyper-V", "Xen"} {
-		if strings.Contains(name, known) {
-			return known
-		}
-	}
-
-	return ""
 }
 
 // baseSpeed prefers what cpufreq calls the base frequency, and falls back to

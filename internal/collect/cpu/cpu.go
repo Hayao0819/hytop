@@ -22,8 +22,10 @@ import (
 )
 
 type Collector struct {
-	fs      procfs.FS
-	sysRoot string
+	fs         procfs.FS
+	procRoot   string
+	sysRoot    string
+	detectVirt func(context.Context, string) (string, error)
 
 	previous map[string]procfs.CPUStat
 	sensor   string
@@ -42,8 +44,11 @@ func New(root, sysRoot string) (*Collector, error) {
 	}
 
 	c := &Collector{
-		fs: fs, sysRoot: sysRoot, previous: make(map[string]procfs.CPUStat),
+		fs: fs, procRoot: root, sysRoot: sysRoot, previous: make(map[string]procfs.CPUStat),
 		rapl: make(map[string]energyReading),
+	}
+	if filepath.Clean(root) == "/proc" && filepath.Clean(sysRoot) == "/sys" {
+		c.detectVirt = systemdVirtualization
 	}
 	c.sensor = c.findSensor()
 

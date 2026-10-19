@@ -23,11 +23,12 @@ func CPU(env Env) reactea.Component {
 type cpuPage struct {
 	reactea.Wrapper
 
-	env  Env
-	box  *layout.Box
-	one  reactea.Component
-	many reactea.Component
-	grid bool
+	env    Env
+	plots  *layout.Box
+	detail *detail
+	one    reactea.Component
+	many   reactea.Component
+	grid   bool
 }
 
 func newCPU(env Env) *cpuPage {
@@ -49,26 +50,26 @@ func newCPU(env Env) *cpuPage {
 		return byCoreNumber(series.Pattern("cpu.core.*.usage").Expand(env.Store.Keys()))
 	})
 	cores.Span = env.Span
-	cores.Border = env.Theme.Colour(theme.Border)
 	cores.Fill = env.fillGraphs()
+	cores.Border = env.Theme.Colour(theme.Border)
 
 	p.many = layout.Framed(quiet, cores).WhenFocused(active)
 
-	p.box = layout.Column(
+	p.plots = layout.Column(layout.Grow(1, p.one).Key("plot").Focusable())
+	p.detail = newDetail(
 		layout.Fixed(1, reactea.Func(p.heading)),
-		layout.Grow(3, p.one).Bounds(minGraph, 0).Key("plot").Focusable(),
-		layout.Grow(2, cpuStats(env)).Bounds(4, 6),
-		layout.Grow(1, cpuFacts(env)).Bounds(4, 4),
+		[]layout.Item{layout.Grow(3, p.plots).Bounds(minGraph, 0).Focusable()},
+		cpuStats(env), cpuFacts(env),
 	)
 
-	p.Wrapper = reactea.Wrap(p.box)
+	p.Wrapper = reactea.Wrap(p.detail)
 
 	return p
 }
 
 func (p *cpuPage) Hints() []Hint {
-	if len(p.box.Starved()) > 0 {
-		return []Hint{{Key: "!", What: "the window is too short for this page"}}
+	if hints := p.detail.Hints(); len(hints) > 0 {
+		return hints
 	}
 
 	return p.env.Keys.Hints(keymap.CPU)
@@ -83,7 +84,7 @@ func (p *cpuPage) Update(ctx *reactea.Ctx, msg tea.Msg) tea.Cmd {
 			plot = p.many
 		}
 
-		p.box.Replace("plot", plot)
+		p.plots.Replace("plot", plot)
 
 		return nil
 	}
@@ -121,6 +122,9 @@ func cpuFacts(env Env) *statgrid.Widget {
 		statgrid.Stat{Label: "Cores", Fact: series.FactCPUCores},
 		statgrid.Stat{Label: "Logical processors", Fact: series.FactCPULogical},
 		statgrid.Stat{Label: "Virtualisation", Fact: series.FactCPUVirtualisation},
+		statgrid.Stat{Label: "Environment", Fact: series.FactCPUEnvironment},
+		statgrid.Stat{Label: "Hypervisor", Fact: series.FactCPUHypervisor},
+		statgrid.Stat{Label: "Confidential VM", Fact: series.FactCPUConfidential},
 		statgrid.Stat{Label: "L1 cache", Fact: series.FactCPUL1d},
 		statgrid.Stat{Label: "L2 cache", Fact: series.FactCPUL2},
 		statgrid.Stat{Label: "L3 cache", Fact: series.FactCPUL3},

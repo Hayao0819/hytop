@@ -39,7 +39,6 @@ type detail struct {
 	reactea.Wrapper
 
 	box    *layout.Box
-	title  string
 	head   layout.Item
 	graphs []layout.Item
 	stats  *statgrid.Widget
@@ -62,27 +61,35 @@ func DetailWithFacts(
 func detailWithGraphs(
 	env Env, title string, graphs []*graph.Widget, stats, facts *statgrid.Widget,
 ) reactea.Component {
-	d := &detail{title: title, stats: stats, facts: facts}
-
-	d.head = layout.Fixed(1, reactea.Func(func(ctx *reactea.Ctx) string {
+	head := layout.Fixed(1, reactea.Func(func(ctx *reactea.Ctx) string {
 		return lipgloss.NewStyle().Bold(true).Width(ctx.Width()).Render(title)
 	}))
 
 	active := pane.BorderForeground(env.Theme.Colour(theme.BorderActive))
+	items := make([]layout.Item, 0, len(graphs))
 	for _, g := range graphs {
 		g.Span = env.Span
-		d.graphs = append(d.graphs, layout.Grow(3, layout.Memo(
+		items = append(items, layout.Grow(3, layout.Memo(
 			layout.Framed(pane.BorderForeground(env.Theme.Colour(theme.Border)), g).WhenFocused(active),
 			func() any { return env.Store.Generation() },
 		)).Bounds(minGraph, 0).Focusable())
 	}
+	return newDetail(head, items, stats, facts)
+}
 
-	d.box = layout.Column(append([]layout.Item{d.head}, d.graphs...)...)
+func newDetail(head layout.Item, graphs []layout.Item, stats, facts *statgrid.Widget) *detail {
+	d := &detail{
+		head: head, graphs: graphs, stats: stats, facts: facts,
+		box: layout.Column(), shaped: [2]int{-1, -1},
+	}
 	d.reshape()
-
 	d.Wrapper = reactea.Wrap(d.box)
-
 	return d
+}
+
+func (d *detail) Init(ctx *reactea.Ctx) tea.Cmd {
+	d.reshape(ctx.Width())
+	return d.Wrapper.Init(ctx)
 }
 
 // Update adjusts dynamic statistic and fact rows before updating children.
@@ -106,11 +113,11 @@ func (d *detail) reshape(width ...int) {
 
 	items := append([]layout.Item{d.head}, d.graphs...)
 	if rows[0] > 0 {
-		items = append(items, layout.Grow(1, d.stats).Bounds(min(2, rows[0]), rows[0]))
+		items = append(items, layout.Grow(1, d.stats).Bounds(rows[0], rows[0]))
 	}
 
 	if rows[1] > 0 {
-		items = append(items, layout.Grow(1, d.facts).Bounds(min(2, rows[1]), rows[1]))
+		items = append(items, layout.Grow(1, d.facts).Bounds(rows[1], rows[1]))
 	}
 
 	d.box.SetItems(items...)
