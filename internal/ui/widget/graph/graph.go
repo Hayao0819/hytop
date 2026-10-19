@@ -112,11 +112,18 @@ func (w *Widget) Render(ctx *reactea.Ctx) string {
 
 	w.extent.Min, w.extent.Max = line.Extent()
 
-	grid := line.Render(width, height)
-
-	w.corners(grid, height)
-
-	return prefix + w.paint(grid, colours)
+	axes := w.Axis && height >= 3
+	plotHeight := height
+	if axes {
+		plotHeight -= 2
+	}
+	drawn := w.paint(line.Render(width, plotHeight), colours)
+	if axes {
+		top := axisLine(width, w.Label, w.Unit.Format(w.extent.Max, w.Precision, w.Scale))
+		bottom := axisLine(width, series.Span(w.Span)+" ago", w.Unit.Format(w.extent.Min, w.Precision, w.Scale))
+		drawn = top + "\n" + drawn + "\n" + bottom
+	}
+	return prefix + drawn
 }
 
 func (w *Widget) legend(tracks []Track, width int) string {
@@ -168,24 +175,16 @@ func (w *Widget) resolveTracks() []Track {
 	return resolved
 }
 
-// Fixed corner labels keep scrolling data from shifting the axis.
-func (w *Widget) corners(grid chart.Grid, height int) {
-	if !w.Axis || height < 2 {
-		return
-	}
-
-	grid.Stamp(0, 0, w.Label)
-	grid.StampRight(0, w.Unit.Format(w.extent.Max, w.Precision, w.Scale))
-	grid.StampRight(height-1, w.Unit.Format(w.extent.Min, w.Precision, w.Scale))
-	grid.Stamp(height-1, 0, series.Span(w.Span)+" ago")
+func axisLine(width int, left, right string) string {
+	right = render.Ellipsize(right, width)
+	left = render.Ellipsize(safe.Text(left), max(0, width-lipgloss.Width(right)-1))
+	gap := strings.Repeat(" ", max(0, width-lipgloss.Width(left)-lipgloss.Width(right)))
+	return lipgloss.NewStyle().Faint(true).Render(left + gap + right)
 }
 
 func (w *Widget) paint(grid chart.Grid, colours []color.Color) string {
-	dim := lipgloss.NewStyle().Faint(true)
 	return grid.Render(func(owner chart.SeriesID) lipgloss.Style {
 		switch {
-		case owner == chart.Label:
-			return dim
 		case owner >= 0 && int(owner) < len(colours):
 			return render.Foreground(w.caps, colours[int(owner)])
 		default:

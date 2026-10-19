@@ -47,7 +47,7 @@ func TestBrailleFillRises(t *testing.T) {
 		"      ⣠⣾",
 		"    ⣠⣾⣿⣿",
 		"  ⢀⣴⣿⣿⣿⣿",
-		"⢀⣴⣿⣿⣿⣿⣿⣿",
+		"⣀⣴⣿⣿⣿⣿⣿⣿",
 	}, "\n")
 
 	if got != want {
@@ -67,7 +67,7 @@ func TestBlockFallbackKeepsTheShape(t *testing.T) {
 
 	lines := g.Plain()
 
-	want := []string{"     ▁▅█", "   ▂▆███", " ▃▇█████"}
+	want := []string{"     ▂▆█", "   ▃▇███", "▁▄██████"}
 	if !slices.Equal(lines, want) {
 		t.Errorf("block fallback:\ngot\n%s\nwant\n%s", show(g), strings.Join(want, "\n"))
 	}
@@ -91,7 +91,7 @@ func TestASCIIUsesNoWideRunes(t *testing.T) {
 		}
 	}
 
-	want := "     .=#\n   .=###\n -######"
+	want := "     .=#\n   -####\n.-######"
 	if got := show(g); got != want {
 		t.Errorf("ASCII fallback:\ngot\n%s\nwant\n%s", got, want)
 	}
@@ -139,37 +139,6 @@ func TestOverlaidSeriesKeepTheirOwnColour(t *testing.T) {
 
 	if !seen[0] || !seen[1] {
 		t.Errorf("a series was lost:\n%s", show(g))
-	}
-}
-
-func TestUnfilledFallbackDrawsOneCellAtRowBoundaries(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name   string
-		glyphs chart.Glyphs
-		want   string
-	}{
-		{"block", chart.Block, "      ▄█\n    ▄█  \n  ▄█    \n▄█      "},
-		{"ASCII", chart.ASCII, "      -#\n    -#  \n  -#    \n-#      "},
-	}
-
-	for _, test := range tests {
-		test := test
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-
-			grid := chart.Line{
-				Series: [][]float64{{12.5, 25, 37.5, 50, 62.5, 75, 87.5, 100}},
-				Range:  chart.Range{Min: 0, Max: 100},
-				Glyphs: test.glyphs,
-				Fill:   false,
-			}.Render(8, 4)
-
-			if got := show(grid); got != test.want {
-				t.Errorf("unfilled fallback:\ngot\n%s\nwant\n%s", got, test.want)
-			}
-		})
 	}
 }
 

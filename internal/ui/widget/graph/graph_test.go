@@ -109,3 +109,44 @@ func TestAutoRangeLabelsItsResolvedMinimum(t *testing.T) {
 		t.Fatalf("bottom axis = %q, want resolved minimum -10", lines[len(lines)-1])
 	}
 }
+
+func TestGraphConnectsReadingsAfterResampling(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now()
+	memory := store.New(metric.DefaultResolutions())
+	for _, sample := range []metric.Sample{
+		{Key: "diskio.total.read", Value: 0, Time: now.Add(-50 * time.Second)},
+		{Key: "diskio.total.read", Value: 100, Time: now.Add(-30 * time.Second)},
+		{Key: "diskio.total.read", Value: 0, Time: now.Add(-10 * time.Second)},
+	} {
+		memory.WriteSamples([]metric.Sample{sample})
+	}
+	for _, glyphs := range []render.Glyphs{render.Braille, render.Block, render.ASCII} {
+		for _, axes := range []bool{false, true} {
+			widget := graph.New(memory, render.Caps{Glyphs: glyphs, Colors: render.Mono},
+				graph.Track{Key: "diskio.total.read"},
+			)
+			widget.Axis, widget.Fill, widget.Label = axes, false, "read and write"
+			program := reactea.New(widget, reactea.WithSize(40, 12))
+			_ = program.Init()
+			shown := testkit.Plain(program)
+			rows := strings.Split(shown, "\n")
+			if len(rows) != 12 {
+				t.Fatalf("%s axes=%t: got %d rows, want 12", glyphs, axes, len(rows))
+			}
+			if axes {
+				if !strings.Contains(rows[0], widget.Label) || !strings.HasSuffix(rows[0], "100 %") ||
+					!strings.Contains(rows[11], "1m ago") || !strings.HasSuffix(rows[11], "0 %") {
+					t.Fatalf("%s: curve obscured the axis labels:\n%s", glyphs, shown)
+				}
+				rows = rows[1:11]
+			}
+			for y, row := range rows {
+				if strings.TrimSpace(row) == "" {
+					t.Fatalf("%s axes=%t: row %d has a gap in the stroke:\n%s", glyphs, axes, y, shown)
+				}
+			}
+		}
+	}
+}

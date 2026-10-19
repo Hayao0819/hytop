@@ -62,7 +62,7 @@ func TestBlockMirrorGrowsDownFromTheMiddle(t *testing.T) {
 		Range: chart.Range{Min: 0, Max: 100}, Glyphs: chart.Block,
 	}.Render(4, 4)
 
-	want := "    \n    \n▔▀██\n  ▀█"
+	want := "    \n    \n▔███\n  ▀█"
 	if got := strings.Join(grid.Plain(), "\n"); got != want {
 		t.Errorf("block mirror:\ngot\n%s\nwant\n%s", got, want)
 	}

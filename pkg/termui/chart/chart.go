@@ -196,6 +196,9 @@ func sample(values []float64, slots int) []float64 {
 	if slots <= 0 {
 		return nil
 	}
+	if len(values) == slots {
+		return values
+	}
 
 	out := make([]float64, slots)
 	for i := range out {
