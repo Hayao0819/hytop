@@ -28,12 +28,13 @@ type Widget struct {
 	Span   time.Duration
 	Border color.Color
 	Keys   func() []series.Key
+	Fill   bool
 }
 
 func New(s *store.Store, caps render.Caps, colour color.Color, keys func() []series.Key) *Widget {
 	return &Widget{
 		store: s, caps: caps, colour: colour,
-		Span: time.Minute, Border: lipgloss.Color("240"), Keys: keys,
+		Span: time.Minute, Border: lipgloss.Color("240"), Keys: keys, Fill: true,
 	}
 }
 
@@ -185,7 +186,7 @@ func (w *Widget) cell(key series.Key, width, height int, bordered bool) []string
 		Series: [][]float64{widget.Resample(points, time.Now(), w.Span, chart.Slots(inner, w.caps.Glyphs))},
 		Range:  chart.Range{Max: 100},
 		Glyphs: w.caps.Glyphs,
-		Fill:   true,
+		Fill:   w.Fill,
 	}.Render(inner, plotHeight)
 
 	plot := render.Foreground(w.caps, w.colour)

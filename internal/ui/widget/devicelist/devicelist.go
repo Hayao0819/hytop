@@ -35,6 +35,7 @@ const rows = 4
 // Widget renders and navigates a device rail.
 type Widget struct {
 	reactea.BasicComponent
+	Fill bool
 
 	store   *store.Store
 	caps    render.Caps
@@ -51,7 +52,7 @@ type Widget struct {
 
 // New constructs a device rail.
 func New(s *store.Store, caps render.Caps, t *theme.Theme, entries ...Entry) *Widget {
-	return &Widget{store: s, caps: caps, theme: t, entries: entries, step: rows}
+	return &Widget{store: s, caps: caps, theme: t, entries: entries, step: rows, Fill: true}
 }
 
 // Entries returns the current rail entries.
@@ -198,7 +199,7 @@ func (w *Widget) entry(entry Entry, width int) []string {
 		Series: [][]float64{widget.Resample(points, time.Now(), time.Minute, chart.Slots(thumbWidth, w.caps.Glyphs))},
 		Range:  chart.Range{Max: entry.Max},
 		Glyphs: w.caps.Glyphs,
-		Fill:   true,
+		Fill:   w.Fill,
 	}.Render(thumbWidth, 2)
 
 	lines := []string{render.Sides(marker+title.Render(entry.Title), reading.Render(value)+" ", width)}

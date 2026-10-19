@@ -17,13 +17,14 @@ import (
 
 // Env contains dependencies shared by pages.
 type Env struct {
-	Store    *store.Store
-	View     *store.ViewState
-	Registry *series.Registry
-	Caps     render.Caps
-	Theme    *theme.Theme
-	Keys     *keymap.Map
-	Span     time.Duration
+	Store      *store.Store
+	View       *store.ViewState
+	Registry   *series.Registry
+	Caps       render.Caps
+	Theme      *theme.Theme
+	Keys       *keymap.Map
+	Span       time.Duration
+	GraphStyle string
 
 	Columns []procmodel.Column
 

@@ -10,6 +10,7 @@ import (
 	"github.com/Hayao0819/reactea/v2"
 	"github.com/Hayao0819/reactea/v2/testkit"
 
+	"github.com/Hayao0819/hytop/internal/conf"
 	"github.com/Hayao0819/hytop/internal/domain/metric"
 	"github.com/Hayao0819/hytop/internal/domain/series"
 	"github.com/Hayao0819/hytop/internal/store"
@@ -33,15 +34,22 @@ func diskGraph(t *testing.T, glyphs render.Glyphs) (*reactea.App, *store.Store) 
 			{Key: "diskio.nvme0n1.util", Value: float64(60 - i), Time: at},
 		})
 	}
+	return diskGraphFromStore(t, glyphs, memory, conf.GraphFilled), memory
+}
+
+func diskGraphFromStore(t *testing.T, glyphs render.Glyphs, memory *store.Store, style string) *reactea.App {
+	t.Helper()
+
 	caps := render.Caps{Glyphs: glyphs, Colors: render.Mono}
 	disk := page.Disk(page.Env{
 		Store: memory, View: store.NewViewState(), Registry: &series.Registry{},
 		Caps: caps, Theme: theme.Build(caps, nil), Keys: keymap.Default(), Span: 5 * time.Minute,
+		GraphStyle: style,
 	})
 	program := reactea.New(disk, reactea.WithSize(80, 24))
 	program.Start()
 
-	return program, memory
+	return program
 }
 
 func TestDiskShowsSeparateThroughputAndActiveTimePlots(t *testing.T) {
@@ -124,6 +132,46 @@ func TestDiskPlotsFitSmallTerminalSizes(t *testing.T) {
 					t.Fatalf("disk rendered %d columns into %dx%d: %q", width, size[0], size[1], line)
 				}
 			}
+		}
+	}
+}
+
+func TestDiskPlotsConnectLargeChanges(t *testing.T) {
+	t.Parallel()
+
+	for _, glyphs := range []render.Glyphs{render.Braille, render.Block, render.ASCII} {
+		memory := store.New(metric.ResolutionsFor(5 * time.Minute))
+		now := time.Now()
+		for _, point := range []struct {
+			age   time.Duration
+			value float64
+		}{{4 * time.Minute, 0}, {3 * time.Minute, 100}, {time.Minute, 0}} {
+			at := now.Add(-point.age)
+			memory.WriteSamples([]metric.Sample{
+				{Key: "diskio.total.read", Value: point.value * (1 << 20), Time: at},
+				{Key: "diskio.nvme0n1.util", Value: point.value, Time: at},
+			})
+		}
+		program := diskGraphFromStore(t, glyphs, memory, conf.GraphLine)
+		program.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
+		shown := testkit.Plain(program)
+		plots := 0
+		var rows []string
+		for _, row := range strings.Split(shown, "\n") {
+			switch {
+			case strings.Contains(row, "╭"):
+				rows = nil
+			case strings.Contains(row, "╰"):
+				if len(rows) < 3 || strings.Trim(rows[len(rows)/2], " │") == "" {
+					t.Fatalf("%s: plot %d has a disconnected stroke:\n%s", glyphs, plots, shown)
+				}
+				plots++
+			default:
+				rows = append(rows, row)
+			}
+		}
+		if plots != 2 {
+			t.Fatalf("%s: got %d plots, want 2:\n%s", glyphs, plots, shown)
 		}
 	}
 }

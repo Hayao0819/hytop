@@ -200,9 +200,7 @@ func TestTheSettingsScreenEditsTheConfiguration(t *testing.T) {
 		t.Fatalf("the settings screen did not open:\n%s", got)
 	}
 
-	for range 7 {
-		press(t, program, "j")
-	}
+	selectSetting(t, program, "Process tree")
 
 	press(t, program, "l")
 
@@ -243,13 +241,26 @@ func TestTheCursorSurvivesAChange(t *testing.T) {
 	program, _, _ := fixtureWith(t, func(env *app.Env) { env.Config = settings(t) })
 
 	mode(t, program, "Settings")
-	press(t, program, "j", "j", "j", "j", "l")
+	selectSetting(t, program, "Graph characters")
+	press(t, program, "l")
 
 	press(t, program, "l")
 
 	if got := plain(program); !strings.Contains(got, "block") {
 		t.Errorf("the cursor did not stay on the glyph row:\n%s", got)
 	}
+}
+
+func selectSetting(t *testing.T, program *reactea.App, label string) {
+	t.Helper()
+
+	for range 32 {
+		if strings.Contains(plain(program), "▎ "+label) {
+			return
+		}
+		press(t, program, "j")
+	}
+	t.Fatalf("setting %q could not be selected:\n%s", label, plain(program))
 }
 
 func TestSettingsScrollToKeepTheCursorVisible(t *testing.T) {
@@ -259,13 +270,55 @@ func TestSettingsScrollToKeepTheCursorVisible(t *testing.T) {
 	mode(t, program, "Settings")
 	program.Send(tea.WindowSizeMsg{Width: 80, Height: 10})
 
-	for range 8 {
-		press(t, program, "j")
-	}
+	selectSetting(t, program, "Kernel threads")
 
 	got := plain(program)
 	if !strings.Contains(got, "Kernel threads") || !strings.Contains(got, "↑") {
 		t.Errorf("the settings cursor moved outside the visible window:\n%s", got)
+	}
+}
+
+func TestGraphStyleCanBeChangedAndSavedWithoutChangingGlyphs(t *testing.T) {
+	t.Parallel()
+
+	var written conf.Config
+	program, _, _ := fixtureWith(t, func(env *app.Env) {
+		env.Config = settings(t)
+		env.Config.Graphs.Glyphs = "ascii"
+		env.SavePath = "/tmp/hytop-test.toml"
+		env.Save = func(c conf.Config) error { written = c; return nil }
+	})
+	filled := strings.Count(plain(program), "#")
+	mode(t, program, "Settings")
+	selectSetting(t, program, "Graph style")
+	press(t, program, "l", "w")
+	if written.Graphs.Style != conf.GraphLine || written.Graphs.Glyphs != "ascii" {
+		t.Fatalf("saved graph settings = %+v, want line with ASCII glyphs", written.Graphs)
+	}
+	mode(t, program, "Graphs")
+	if line := strings.Count(plain(program), "#"); line >= filled {
+		t.Fatalf("line style occupies %d cells versus %d filled cells:\n%s", line, filled, plain(program))
+	}
+}
+
+func TestGraphStyleReloadsInPlace(t *testing.T) {
+	t.Parallel()
+
+	cfg := settings(t)
+	cfg.Graphs.Glyphs = "ascii"
+	source := &live{config: cfg}
+	program, _, _ := fixtureWith(t, func(env *app.Env) {
+		env.Config, env.Live = cfg, source
+	})
+	filled := strings.Count(plain(program), "#")
+	cfg.Graphs.Style = conf.GraphLine
+	source.set(cfg)
+	reload(program)
+	if program.Route() != "/graphs/cpu" {
+		t.Fatalf("style reload changed route to %s", program.Route())
+	}
+	if line := strings.Count(plain(program), "#"); line >= filled {
+		t.Fatalf("reloaded line style occupies %d cells versus %d filled cells", line, filled)
 	}
 }
 

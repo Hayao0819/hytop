@@ -39,7 +39,7 @@ func TestSetupEditsPreviewsAndSavesTheSelectedValues(t *testing.T) {
 			t.Fatalf("setup is missing %q:\n%s", want, view)
 		}
 	}
-	for _, hidden := range []string{"Terminal background", "Graph style", "Collection period", "Process tree"} {
+	for _, hidden := range []string{"Terminal background", "Graph characters", "Collection period", "Process tree"} {
 		if strings.Contains(view, hidden) {
 			t.Fatalf("setup shows the later question %q too early:\n%s", hidden, view)
 		}

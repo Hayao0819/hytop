@@ -154,6 +154,7 @@ func (r *Root) build() {
 		Theme:      r.theme,
 		Keys:       r.keys,
 		Span:       time.Duration(r.config.General.Span),
+		GraphStyle: r.config.Graphs.Style,
 		Columns:    r.config.Columns(),
 		Interfaces: r.env.Interfaces,
 		GPUs:       r.env.GPUs,

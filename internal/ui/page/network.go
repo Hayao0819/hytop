@@ -66,6 +66,7 @@ func (p *networkPage) items(cards []string) []layout.Item {
 	for _, iface := range shown {
 		card := netgraph.New(env.Store, env.Caps, iface, env.Theme.Colour(theme.NetRx), env.Theme.Colour(theme.NetTx))
 		card.Span = env.Span
+		card.Fill = env.fillGraphs()
 
 		items = append(items, layout.Grow(1, layout.Framed(pane, card)).Bounds(perCard, 0))
 	}

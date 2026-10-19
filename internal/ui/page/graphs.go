@@ -35,6 +35,7 @@ func NewGraphs(env Env) *Graphs {
 
 	g.pages = router.NewWithRoutes(router.Routes{})
 	g.rail = devicelist.New(env.Store, env.Caps, env.Theme)
+	g.rail.Fill = env.fillGraphs()
 
 	g.refresh()
 

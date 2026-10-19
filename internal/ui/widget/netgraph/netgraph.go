@@ -26,10 +26,11 @@ type Widget struct {
 
 	Rx, Tx color.Color
 	Span   time.Duration
+	Fill   bool
 }
 
 func New(s *store.Store, caps render.Caps, iface string, rx, tx color.Color) *Widget {
-	return &Widget{store: s, caps: caps, iface: iface, Rx: rx, Tx: tx, Span: time.Minute}
+	return &Widget{store: s, caps: caps, iface: iface, Rx: rx, Tx: tx, Span: time.Minute, Fill: true}
 }
 
 func (w *Widget) key(what string) series.Key {
@@ -57,7 +58,11 @@ func (w *Widget) Render(ctx *reactea.Ctx) string {
 		Glyphs: w.caps.Glyphs,
 	}
 
-	grid := mirror.Render(width, plotHeight)
+	draw := mirror.Render
+	if !w.Fill {
+		draw = mirror.RenderLines
+	}
+	grid := draw(width, plotHeight)
 
 	top := series.BytesPerSecond.Format(mirror.Top(), 0, series.Auto)
 	grid.StampRight(0, top+" rx")

@@ -190,6 +190,7 @@ func dashboardGraph(env Env, spec conf.Pane) (reactea.Component, error) {
 	}
 
 	g := graph.New(env.Store, caps, tracks...)
+	g.Fill = env.fillGraphs()
 	g.Span = env.Span
 	if spec.History > 0 {
 		g.Span = time.Duration(spec.History)

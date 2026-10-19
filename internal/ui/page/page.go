@@ -13,6 +13,7 @@ import (
 	"github.com/Hayao0819/reactea/v2"
 	"github.com/Hayao0819/reactea/v2/layout"
 
+	"github.com/Hayao0819/hytop/internal/conf"
 	"github.com/Hayao0819/hytop/internal/domain/series"
 	"github.com/Hayao0819/hytop/internal/ui/theme"
 	"github.com/Hayao0819/hytop/internal/ui/widget/graph"
@@ -25,6 +26,14 @@ var pane = lipgloss.NewStyle().BorderStyle(lipgloss.RoundedBorder()).Padding(0, 
 
 // minGraph reserves two border rows and four content rows.
 const minGraph = 6
+
+func (env Env) fillGraphs() bool { return env.GraphStyle != conf.GraphLine }
+
+func (env Env) graph(tracks ...graph.Track) *graph.Widget {
+	g := graph.New(env.Store, env.Caps, tracks...)
+	g.Fill = env.fillGraphs()
+	return g
+}
 
 type detail struct {
 	reactea.Wrapper
@@ -117,7 +126,7 @@ func (d *detail) Hints() []Hint {
 }
 
 func Memory(env Env) reactea.Component {
-	g := graph.New(env.Store, env.Caps,
+	g := env.graph(
 		graph.Track{Key: "mem.usage", Colour: env.Theme.Colour(theme.Memory)},
 	)
 	g.Range = chart.Range{Max: 100}
@@ -155,16 +164,15 @@ func Memory(env Env) reactea.Component {
 }
 
 func Disk(env Env) reactea.Component {
-	g := graph.New(env.Store, env.Caps,
+	g := env.graph(
 		graph.Track{Key: "diskio.total.read", Colour: env.Theme.Colour(theme.DiskRead)},
 		graph.Track{Key: "diskio.total.write", Colour: env.Theme.Colour(theme.DiskWrite)},
 	)
 	g.Range = chart.Range{}
 	g.Unit = series.BytesPerSecond
-	g.Fill = false
 	g.Label = "read and write"
 
-	utilisation := graph.New(env.Store, env.Caps, graph.Track{
+	utilisation := env.graph(graph.Track{
 		Pattern: "diskio.*.util",
 		Palette: []color.Color{
 			env.Theme.Colour(theme.DiskRead), env.Theme.Colour(theme.DiskWrite),
@@ -172,7 +180,6 @@ func Disk(env Env) reactea.Component {
 		},
 	})
 	utilisation.Range = chart.Range{Max: 100}
-	utilisation.Fill = false
 	utilisation.Label = "% active time"
 	utilisation.Legend = func(key series.Key) string {
 		name := key.Segments()[1]
@@ -220,7 +227,7 @@ func coreNumber(key series.Key) int {
 }
 
 func Sensors(env Env) reactea.Component {
-	g := graph.New(env.Store, env.Caps,
+	g := env.graph(
 		graph.Track{Key: "thermal.max.temp", Colour: env.Theme.Colour(theme.Critical)},
 		graph.Track{Key: "cpu.package.temp", Colour: env.Theme.Colour(theme.CPU)},
 	)
@@ -238,7 +245,7 @@ func Sensors(env Env) reactea.Component {
 
 func GPU(env Env, index int, name string) reactea.Component {
 	prefix := fmt.Sprintf("gpu.%d.", index)
-	g := graph.New(env.Store, env.Caps,
+	g := env.graph(
 		graph.Track{Key: series.Key(prefix + "util"), Colour: env.Theme.Colour(theme.CPU)},
 	)
 	g.Range = chart.Range{Max: 100}
@@ -268,7 +275,7 @@ func GPU(env Env, index int, name string) reactea.Component {
 
 func Battery(env Env, index int, name string) reactea.Component {
 	prefix := fmt.Sprintf("battery.%d.", index)
-	g := graph.New(env.Store, env.Caps,
+	g := env.graph(
 		graph.Track{Key: series.Key(prefix + "capacity"), Colour: env.Theme.Colour(theme.Battery)},
 	)
 	g.Range = chart.Range{Max: 100}

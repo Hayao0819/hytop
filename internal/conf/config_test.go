@@ -43,6 +43,38 @@ func TestLoadWithNoFilesIsTheDefault(t *testing.T) {
 	if got.Graphs.Glyphs != conf.Auto {
 		t.Errorf("glyphs = %q, want auto", got.Graphs.Glyphs)
 	}
+	if got.Graphs.Style != conf.GraphFilled {
+		t.Errorf("graph style = %q, want filled", got.Graphs.Style)
+	}
+}
+
+func TestGraphStyleLayersAndRoundTrips(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	system, user := filepath.Join(dir, "system.toml"), filepath.Join(dir, "user.toml")
+	write(t, system, "[graphs]\nstyle = 'line'\nglyphs = 'ascii'\n")
+	write(t, user, "[graphs]\ncolors = 'mono'\n")
+	cfg, err := (conf.Sources{System: system, User: user}).Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Graphs.Style != conf.GraphLine || cfg.Graphs.Glyphs != "ascii" || cfg.Graphs.Colors != "mono" {
+		t.Fatalf("layered graph settings = %+v", cfg.Graphs)
+	}
+	for _, style := range []string{conf.GraphFilled, conf.GraphLine} {
+		cfg.Graphs.Style = style
+		if err := conf.Save(user, cfg); err != nil {
+			t.Fatal(err)
+		}
+		got, err := (conf.Sources{User: user}).Load()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.Graphs != cfg.Graphs {
+			t.Fatalf("round-tripped graph settings = %+v, want %+v", got.Graphs, cfg.Graphs)
+		}
+	}
 }
 
 func TestConfigCloneOwnsNestedLayoutValues(t *testing.T) {
@@ -218,6 +250,7 @@ func TestValidateRejectsWhatCannotBeHonoured(t *testing.T) {
 		"a span below the period":        "[general]\ninterval = \"10s\"\nspan = \"1s\"\n",
 		"a span above the limit":         "[general]\nspan = \"25h\"\n",
 		"an unknown glyph family":        "[graphs]\nglyphs = \"runes\"\n",
+		"an unknown graph style":         "[graphs]\nstyle = \"points\"\n",
 		"an unknown graph device":        "[graphs]\ndevice = \"processor\"\n",
 		"an unknown sort key":            "[processes]\nsort = \"colour\"\n",
 		"no log lines":                   "[logs]\nlines = 0\n",

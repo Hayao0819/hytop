@@ -44,6 +44,7 @@ func TestSaveSetupWritesOnlyChoicesThatChanged(t *testing.T) {
 	selected := base.Clone()
 	selected.Appearance.Contrast = conf.ContrastHigh
 	selected.Graphs.Glyphs = "block"
+	selected.Graphs.Style = conf.GraphLine
 	selected.General.Span = conf.Duration(5 * time.Minute)
 	selected.Processes.Tree = true
 
@@ -56,7 +57,7 @@ func TestSaveSetupWritesOnlyChoicesThatChanged(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(contents)
-	for _, want := range []string{"configured by hytop setup", "contrast", "glyphs", "span", "tree"} {
+	for _, want := range []string{"configured by hytop setup", "contrast", "glyphs", "style", "span", "tree"} {
 		if !strings.Contains(text, want) {
 			t.Errorf("initial configuration does not contain %q:\n%s", want, text)
 		}
@@ -71,7 +72,7 @@ func TestSaveSetupWritesOnlyChoicesThatChanged(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Appearance.Contrast != conf.ContrastHigh || got.Graphs.Glyphs != "block" ||
+	if got.Appearance.Contrast != conf.ContrastHigh || got.Graphs.Glyphs != "block" || got.Graphs.Style != conf.GraphLine ||
 		got.General.Span != selected.General.Span || !got.Processes.Tree {
 		t.Errorf("loaded setup = %+v, want the selected values", got)
 	}

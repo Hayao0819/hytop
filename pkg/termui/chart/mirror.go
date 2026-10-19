@@ -12,6 +12,15 @@ type Mirror struct {
 
 // Render draws both halves into a grid of width by height cells.
 func (m Mirror) Render(width, height int) Grid {
+	return m.render(width, height, true)
+}
+
+// RenderLines draws both halves without filling the area under each line.
+func (m Mirror) RenderLines(width, height int) Grid {
+	return m.render(width, height, false)
+}
+
+func (m Mirror) render(width, height int, fill bool) Grid {
 	if width <= 0 || height <= 0 {
 		return Grid{}
 	}
@@ -26,12 +35,12 @@ func (m Mirror) Render(width, height int) Grid {
 	}
 
 	if upper > 0 {
-		up := Line{Series: [][]float64{m.Up}, Range: shared, Glyphs: m.Glyphs, Fill: true}.Render(width, upper)
+		up := Line{Series: [][]float64{m.Up}, Range: shared, Glyphs: m.Glyphs, Fill: fill}.Render(width, upper)
 		copy(grid[:upper], up)
 	}
 
 	if lower > 0 {
-		down := Line{Series: [][]float64{m.Down}, Range: shared, Glyphs: m.Glyphs, Fill: true}.Render(width, lower)
+		down := Line{Series: [][]float64{m.Down}, Range: shared, Glyphs: m.Glyphs, Fill: fill}.Render(width, lower)
 
 		for y := range lower {
 			grid[upper+y] = flipRow(down[lower-1-y], m.Glyphs, 1)

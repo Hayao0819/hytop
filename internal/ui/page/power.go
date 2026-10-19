@@ -78,7 +78,7 @@ func Power(env Env, keys []series.Key) reactea.Component {
 		})
 	}
 
-	g := graph.New(env.Store, env.Caps, tracks...)
+	g := env.graph(tracks...)
 	g.Range = chart.Range{}
 	g.Unit = series.Watts
 	g.Label = "individual sensors; not summed"

@@ -239,7 +239,7 @@ func (s *setup) preview(t *theme.Theme, width int) []string {
 	graphWidth := min(max(width-6, 12), 48)
 	values := []float64{18, 24, 30, 62, 48, 72, 66, 80, 54, 42, 58, 76}
 	grid := chart.Line{
-		Series: [][]float64{values}, Glyphs: s.config.Caps(s.caps).Glyphs, Fill: true,
+		Series: [][]float64{values}, Glyphs: s.config.Caps(s.caps).Glyphs, Fill: s.config.Graphs.Style != conf.GraphLine,
 	}.Render(graphWidth, 2)
 	lines = append(lines, grid.Lines(func(owner chart.SeriesID) lipgloss.Style {
 		if owner == chart.Empty {
@@ -260,7 +260,7 @@ func (s *setup) review(t *theme.Theme, compact bool) []string {
 	if compact {
 		return []string{
 			value("Text contrast", s.config.Appearance.Contrast),
-			value("Graph style", s.config.Graphs.Glyphs),
+			value("Graph characters", s.config.Graphs.Glyphs),
 			value("Collection period", s.config.General.Interval.String()),
 			value("Process tree", boolName(s.config.Processes.Tree)),
 			value("Write", safe.Text(s.path)),
@@ -270,7 +270,7 @@ func (s *setup) review(t *theme.Theme, compact bool) []string {
 	return []string{
 		t.Style(theme.Heading).Render("Ready to start"),
 		value("Text contrast", s.config.Appearance.Contrast),
-		value("Graph style", s.config.Graphs.Glyphs),
+		value("Graph characters", s.config.Graphs.Glyphs),
 		value("Collection period", s.config.General.Interval.String()),
 		value("Process tree", boolName(s.config.Processes.Tree)),
 		"",

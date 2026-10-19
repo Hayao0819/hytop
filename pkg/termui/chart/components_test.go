@@ -68,6 +68,37 @@ func TestBlockMirrorGrowsDownFromTheMiddle(t *testing.T) {
 	}
 }
 
+func TestMirrorCanRenderOnlyTheLines(t *testing.T) {
+	t.Parallel()
+
+	for _, glyphs := range []chart.Glyphs{chart.Braille, chart.Block, chart.ASCII} {
+		mirror := chart.Mirror{
+			Up: []float64{75, 75}, Down: []float64{50, 50},
+			Range: chart.Range{Max: 100}, Glyphs: glyphs,
+		}
+		filled, lines := mirror.Render(2, 12), mirror.RenderLines(2, 12)
+		var fillCells, lineCells int
+		var owners [2]bool
+		for y, row := range lines {
+			for x, cell := range row {
+				if filled[y][x].Series >= 0 {
+					fillCells++
+				}
+				if cell.Series >= 0 {
+					lineCells++
+					owners[cell.Series] = true
+				}
+			}
+		}
+		if lineCells >= fillCells || !owners[0] || !owners[1] {
+			t.Fatalf("%s: outline has %d cells versus %d filled cells, owners=%v", glyphs, lineCells, fillCells, owners)
+		}
+	}
+	if got := (chart.Mirror{}).RenderLines(0, 0); len(got) != 0 {
+		t.Fatalf("zero-size mirror outline has %d rows", len(got))
+	}
+}
+
 func TestGaugeClampsAndHandlesNaN(t *testing.T) {
 	t.Parallel()
 

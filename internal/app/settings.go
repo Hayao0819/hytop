@@ -53,6 +53,13 @@ func preferences() []preference {
 			Apply: func(c *conf.Config, value string) { c.General.Interval = duration(value) },
 		},
 		{
+			Step: setupOmit, Group: "Graphs", Label: "Graph style",
+			What:    "filled shades the area below each line; line draws only its outline",
+			Options: []string{conf.GraphFilled, conf.GraphLine},
+			Value:   func(c conf.Config) string { return c.Graphs.Style },
+			Apply:   func(c *conf.Config, value string) { c.Graphs.Style = value },
+		},
+		{
 			Step: setupContrast, Group: "Appearance", Label: "Text contrast",
 			What:    "auto uses the terminal foreground; standard uses muted grey",
 			Options: []string{conf.Auto, conf.ContrastStandard, conf.ContrastHigh},
@@ -67,7 +74,7 @@ func preferences() []preference {
 			Apply:   func(c *conf.Config, value string) { c.Appearance.Background = value },
 		},
 		{
-			Step: setupGlyphs, Group: "Appearance", Label: "Graph style",
+			Step: setupGlyphs, Group: "Appearance", Label: "Graph characters",
 			What:    "braille is finer, block and ASCII are more widely supported",
 			Options: append([]string{conf.Auto}, render.GlyphNames()...),
 			Value:   func(c conf.Config) string { return c.Graphs.Glyphs },

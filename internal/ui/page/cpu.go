@@ -35,7 +35,7 @@ func newCPU(env Env) *cpuPage {
 	active := pane.BorderForeground(env.Theme.Colour(theme.BorderActive))
 	quiet := pane.BorderForeground(env.Theme.Colour(theme.Border))
 
-	total := graph.New(env.Store, env.Caps,
+	total := env.graph(
 		graph.Track{Key: "cpu.total.usage", Colour: env.Theme.Colour(theme.CPU)},
 		graph.Track{Key: "psi.cpu.some.avg10", Colour: env.Theme.Colour(theme.CPUPressure)},
 	)
@@ -50,6 +50,7 @@ func newCPU(env Env) *cpuPage {
 	})
 	cores.Span = env.Span
 	cores.Border = env.Theme.Colour(theme.Border)
+	cores.Fill = env.fillGraphs()
 
 	p.many = layout.Framed(quiet, cores).WhenFocused(active)
 

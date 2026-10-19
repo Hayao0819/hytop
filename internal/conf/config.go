@@ -42,6 +42,7 @@ type General struct {
 }
 
 type Graphs struct {
+	Style  string `toml:"style"`
 	Glyphs string `toml:"glyphs"`
 	Colors string `toml:"colors"`
 	Device string `toml:"device"`
@@ -139,6 +140,7 @@ func Default() Config {
 			Background: Auto,
 		},
 		Graphs: Graphs{
+			Style:  GraphFilled,
 			Glyphs: Auto,
 			Colors: Auto,
 			Device: "cpu",
@@ -156,6 +158,8 @@ func Default() Config {
 const Auto = "auto"
 
 const (
+	GraphFilled      = "filled"
+	GraphLine        = "line"
 	ContrastStandard = "standard"
 	ContrastHigh     = "high"
 	BackgroundDark   = "dark"
@@ -339,6 +343,7 @@ func (c Config) validateDisplay() error {
 	}{
 		{"appearance.contrast", c.Appearance.Contrast, []string{Auto, ContrastStandard, ContrastHigh}},
 		{"appearance.background", c.Appearance.Background, []string{Auto, BackgroundDark, BackgroundLight}},
+		{"graphs.style", c.Graphs.Style, []string{GraphFilled, GraphLine}},
 		{"graphs.glyphs", c.Graphs.Glyphs, append(render.GlyphNames(), Auto)},
 		{"graphs.colors", c.Graphs.Colors, append(render.ColorNames(), Auto)},
 		{"graphs.device", c.Graphs.Device, []string{"cpu", "memory", "disk", "network", "sensors"}},

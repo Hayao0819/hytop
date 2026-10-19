@@ -51,6 +51,7 @@ type setupAppearance struct {
 }
 
 type setupGraphs struct {
+	Style  *string `toml:"style,omitempty"`
 	Glyphs *string `toml:"glyphs,omitempty"`
 	Colors *string `toml:"colors,omitempty"`
 }
@@ -109,8 +110,11 @@ func setupChanges(base, selected Config) setupFile {
 		}
 	}
 
-	if selected.Graphs.Glyphs != base.Graphs.Glyphs || selected.Graphs.Colors != base.Graphs.Colors {
+	if selected.Graphs.Style != base.Graphs.Style || selected.Graphs.Glyphs != base.Graphs.Glyphs || selected.Graphs.Colors != base.Graphs.Colors {
 		out.Graphs = &setupGraphs{}
+		if selected.Graphs.Style != base.Graphs.Style {
+			out.Graphs.Style = &selected.Graphs.Style
+		}
 		if selected.Graphs.Glyphs != base.Graphs.Glyphs {
 			out.Graphs.Glyphs = &selected.Graphs.Glyphs
 		}
